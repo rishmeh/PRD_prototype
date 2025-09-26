@@ -2,7 +2,9 @@ const express = require("express");
 const router = express.Router();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const dotenv= require("dotenv");
+const dotenv = require("dotenv");
+const multer = require("multer");
+const path = require("path");
 const {
   User,
   Technician,
@@ -18,6 +20,32 @@ router.use(express.json());
 router.use(cors());
 
 dotenv.config();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/') // Make sure this directory exists
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname))
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
+
 // JWT Secret key (move to .env in production)
 const JWT_SECRET = process.env.jwtsecret;
 
@@ -101,13 +129,40 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Get profile
+// Get user profile
 router.get("/me", verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch profile" });
+    res.status(500).json({ message: "Failed to fetch user profile", error: err.message });
+  }
+});
+
+// Update user profile
+router.put("/me", verifyToken, async (req, res) => {
+  const { userName, email, phone } = req.body;
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      { userName, email, phone },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(updatedUser);
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: "Email or phone already exists" });
+    }
+    res.status(500).json({ message: "Failed to update profile", error: err.message });
   }
 });
 
@@ -146,33 +201,187 @@ router.get("/technicians", async (req, res) => {
   }
 });
 
-// ---------------- BOOKINGS ----------------
-
-// Create booking
-router.post("/bookings", verifyToken, async (req, res) => {
-  if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
-
+// Get reviews for a technician
+router.get("/technicians/:id/reviews", async (req, res) => {
   try {
-    const booking = new Booking({ customerId: req.userId, ...req.body });
-    await booking.save();
-    res.status(201).json(booking);
+    const reviews = await Review.find({ technicianId: req.params.id })
+      .populate("customerId", "userName")
+      .sort({ createdAt: -1 });
+
+    res.json(reviews);
   } catch (err) {
-    res.status(500).json({ message: "Failed to create booking", error: err.message });
+    res.status(500).json({ message: "Failed to fetch reviews", error: err.message });
   }
 });
 
-// Update booking status (technician accept/reject, complete, cancel)
-router.patch("/bookings/:id/status", verifyToken, async (req, res) => {
-  const { status } = req.body;
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+// Get technician profile for current user
+router.get("/technicians/me", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
 
-    booking.status = status;
-    await booking.save();
+  try {
+    const profile = await Technician.findOne({ userId: req.userId }).populate("userId", "userName email phone");
+
+    if (!profile) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch technician profile", error: err.message });
+  }
+});
+
+// KYC document upload
+router.post("/technicians/kyc", verifyToken, upload.fields([
+  { name: "IDImage", maxCount: 1 },
+  { name: "Photo", maxCount: 1 }
+]), async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+
+  try {
+    const kycDocuments = {};
+
+    if (req.files.IDImage) {
+      kycDocuments.IDImage = req.files.IDImage[0].path;
+    }
+    if (req.files.Photo) {
+      kycDocuments.Photo = req.files.Photo[0].path;
+    }
+
+    const updatedTechnician = await Technician.findOneAndUpdate(
+      { userId: req.userId },
+      { 
+        kycDocuments,
+        kycStatus: "pending"
+      },
+      { new: true }
+    );
+
+    if (!updatedTechnician) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+
+    res.json({ message: "KYC documents uploaded successfully", kycStatus: "pending" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to upload KYC documents", error: err.message });
+  }
+});
+
+// Update booking status (for technicians)
+router.put("/bookings/:id/status", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+
+  const { status } = req.body;
+  const validStatuses = ["accepted", "rejected", "in_progress", "completed"];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  try {
+    // First check if technician KYC is approved
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician || technician.kycStatus !== "approved") {
+      return res.status(403).json({ message: "KYC approval required to manage bookings" });
+    }
+
+    const booking = await Booking.findOneAndUpdate(
+      { _id: req.params.id, technicianId: req.userId },
+      { 
+        status,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).populate("customerId", "userName email phone")
+     .populate("technicianId", "userName email phone");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found or not assigned to you" });
+    }
+
+    // Here you could add email/SMS notification logic
+    // For now, we'll just log the status change
+    console.log(`Booking ${booking._id} status changed to ${status} by technician ${req.userId}`);
+
     res.json(booking);
   } catch (err) {
-    res.status(500).json({ message: "Failed to update booking" });
+    res.status(500).json({ message: "Failed to update booking status", error: err.message });
+  }
+});
+
+
+// Get technician bookings (with KYC check)
+router.get("/technicians/bookings", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+
+  try {
+    // Check if technician KYC is approved
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician || technician.kycStatus !== "approved") {
+      return res.status(403).json({ message: "KYC approval required to access bookings" });
+    }
+
+    const bookings = await Booking.find({ technicianId: req.userId })
+      .populate("customerId", "userName email phone")
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch bookings", error: err.message });
+  }
+});
+
+// ---------------- BOOKINGS ----------------
+
+// Get customer's bookings
+router.get("/bookings/customer", verifyToken, async (req, res) => {
+  if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
+
+  try {
+    const bookings = await Booking.find({ customerId: req.userId })
+      .populate("technicianId", "userName email phone")
+      .populate("reviewId")
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch bookings", error: err.message });
+  }
+});
+
+// Create a new booking
+router.post("/bookings", verifyToken, async (req, res) => {
+  if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
+
+  const { technicianId, serviceType, scheduledDate, scheduledTime, address, description } = req.body;
+
+  try {
+    // Check if technician exists and is approved
+    const technician = await Technician.findById(technicianId);
+    if (!technician || technician.kycStatus !== "approved") {
+      return res.status(400).json({ message: "Selected technician is not available" });
+    }
+
+    const booking = new Booking({
+      customerId: req.userId,
+      technicianId: technician.userId, // Store the user ID, not technician profile ID
+      serviceType,
+      scheduledDate,
+      scheduledTime,
+      address,
+      description,
+      status: "pending"
+    });
+
+    await booking.save();
+
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate("customerId", "userName email phone")
+      .populate("technicianId", "userName email phone");
+
+    res.status(201).json(populatedBooking);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to create booking", error: err.message });
   }
 });
 
@@ -180,12 +389,57 @@ router.patch("/bookings/:id/status", verifyToken, async (req, res) => {
 router.post("/reviews", verifyToken, async (req, res) => {
   if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
 
+  const { bookingId, rating, comment } = req.body;
+
   try {
-    const review = new Review({ customerId: req.userId, ...req.body });
+    // Check if booking exists and belongs to customer
+    const booking = await Booking.findOne({ 
+      _id: bookingId, 
+      customerId: req.userId,
+      status: "completed"
+    });
+
+    if (!booking) {
+      return res.status(400).json({ message: "Booking not found or not completed" });
+    }
+
+    // Check if review already exists
+    const existingReview = await Review.findOne({ bookingId });
+    if (existingReview) {
+      return res.status(400).json({ message: "Review already exists for this booking" });
+    }
+
+    const review = new Review({
+      customerId: req.userId,
+      technicianId: booking.technicianId,
+      bookingId,
+      rating,
+      comment
+    });
+
     await review.save();
+
+    // Update booking with review ID
+    await Booking.findByIdAndUpdate(bookingId, { reviewId: review._id });
+
+    // Recalculate technician's average rating
+    const technician = await Technician.findOne({ userId: booking.technicianId });
+    if (technician) {
+      const reviews = await Review.find({ technicianId: booking.technicianId });
+      const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+
+      await Technician.findOneAndUpdate(
+        { userId: booking.technicianId },
+        { 
+          avgRating: Math.round(avgRating * 10) / 10,
+          totalReviews: reviews.length
+        }
+      );
+    }
+
     res.status(201).json(review);
   } catch (err) {
-    res.status(500).json({ message: "Failed to add review" });
+    res.status(500).json({ message: "Failed to create review", error: err.message });
   }
 });
 
@@ -213,25 +467,487 @@ router.post("/admin/actions", verifyToken, async (req, res) => {
   }
 });
 
-// ---------------- PARTS ----------------
-router.get("/parts", async (req, res) => {
+// Admin route to approve/reject KYC
+router.put("/admin/technicians/:id/kyc", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  const { kycStatus } = req.body;
+  const validStatuses = ["approved", "rejected"];
+
+  if (!validStatuses.includes(kycStatus)) {
+    return res.status(400).json({ message: "Invalid KYC status" });
+  }
+
   try {
-    const parts = await Part.find();
-    res.json(parts);
+    const technician = await Technician.findByIdAndUpdate(
+      req.params.id,
+      { kycStatus },
+      { new: true }
+    ).populate("userId", "userName email");
+
+    if (!technician) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
+
+    res.json({ message: `KYC ${kycStatus} successfully`, technician });
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch parts" });
+    res.status(500).json({ message: "Failed to update KYC status", error: err.message });
   }
 });
 
-router.post("/parts/order", verifyToken, async (req, res) => {
+
+// Add these routes to your route.js file for admin functionality
+
+// Get all technicians (admin only)
+router.get("/admin/technicians", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const technicians = await Technician.find({})
+      .populate("userId", "userName email phone status createdAt")
+      .sort({ createdAt: -1 });
+
+    res.json(technicians);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch technicians", error: err.message });
+  }
+});
+
+// Get all users (admin only)
+router.get("/admin/users", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const users = await User.find({}).select("-password").sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch users", error: err.message });
+  }
+});
+
+// Get all bookings (admin only)
+router.get("/admin/bookings", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const bookings = await Booking.find({})
+      .populate("customerId", "userName email phone")
+      .populate("technicianId", "userName email phone")
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch bookings", error: err.message });
+  }
+});
+
+// Get all flags (admin only)
+router.get("/admin/flags", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const flags = await Flag.find({})
+      .populate("raisedBy", "userName email")
+      .populate("againstUser", "userName email")
+      .sort({ createdAt: -1 });
+
+    res.json(flags);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch flags", error: err.message });
+  }
+});
+
+// Get all reviews (admin only)
+router.get("/admin/reviews", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const reviews = await Review.find({})
+      .populate("customerId", "userName email")
+      .populate("technicianId", "userName email")
+      .sort({ createdAt: -1 });
+
+    res.json(reviews);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch reviews", error: err.message });
+  }
+});
+
+// Update user status (admin only)
+router.put("/admin/users/:id/status", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  const { status } = req.body;
+  const validStatuses = ["active", "suspended", "pending_verification"];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: `User status updated to ${status}`, user });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update user status", error: err.message });
+  }
+});
+
+// Add new part (admin only)
+router.post("/admin/parts", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const part = new Part(req.body);
+    await part.save();
+    res.status(201).json(part);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to add part", error: err.message });
+  }
+});
+
+// Update part (admin only)
+router.put("/admin/parts/:id", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const part = await Part.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!part) {
+      return res.status(404).json({ message: "Part not found" });
+    }
+    res.json(part);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update part", error: err.message });
+  }
+});
+
+// Delete part (admin only)
+router.delete("/admin/parts/:id", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const part = await Part.findByIdAndDelete(req.params.id);
+    if (!part) {
+      return res.status(404).json({ message: "Part not found" });
+    }
+    res.json({ message: "Part deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete part", error: err.message });
+  }
+});
+
+// Update flag status (admin only)
+router.put("/admin/flags/:id", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  const { status, resolvedBy } = req.body;
+  const validStatuses = ["open", "resolved", "dismissed"];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid flag status" });
+  }
+
+  try {
+    const flag = await Flag.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status, 
+        resolvedBy: req.userId,
+        resolvedAt: status !== "open" ? new Date() : null
+      },
+      { new: true }
+    ).populate("raisedBy", "userName email")
+     .populate("againstUser", "userName email");
+
+    if (!flag) {
+      return res.status(404).json({ message: "Flag not found" });
+    }
+
+    res.json({ message: `Flag ${status} successfully`, flag });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update flag status", error: err.message });
+  }
+});
+
+// Get admin dashboard stats
+router.get("/admin/dashboard", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [
+      totalUsers,
+      totalTechnicians,
+      totalBookings,
+      todaysBookings,
+      pendingKyc,
+      activeFlags,
+      completedBookings
+    ] = await Promise.all([
+      User.countDocuments({}),
+      Technician.countDocuments({}),
+      Booking.countDocuments({}),
+      Booking.countDocuments({ createdAt: { $gte: today, $lt: tomorrow } }),
+      Technician.countDocuments({ kycStatus: "pending" }),
+      Flag.countDocuments({ status: "open" }),
+      Booking.countDocuments({ status: "completed" })
+    ]);
+
+    // Calculate total revenue (simplified - based on completed bookings)
+    const revenueBookings = await Booking.find({ status: "completed" })
+      .populate({
+        path: "technicianId",
+        populate: {
+          path: "userId"
+        }
+      });
+
+    let totalRevenue = 0;
+    for (const booking of revenueBookings) {
+      const tech = await Technician.findOne({ userId: booking.technicianId });
+      if (tech && tech.pricing) {
+        totalRevenue += tech.pricing;
+      }
+    }
+
+    const stats = {
+      totalUsers,
+      totalTechnicians,
+      totalBookings,
+      todaysBookings,
+      pendingKyc,
+      activeFlags,
+      completedBookings,
+      totalRevenue,
+      conversionRate: totalBookings > 0 ? ((completedBookings / totalBookings) * 100).toFixed(1) : 0
+    };
+
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch dashboard stats", error: err.message });
+  }
+});
+
+// Delete user (admin only) - use with caution
+router.delete("/admin/users/:id", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Also delete related data
+    if (user.role === "technician") {
+      await Technician.deleteOne({ userId: req.params.id });
+    }
+
+    // Note: Consider soft deletion or archiving instead of hard deletion
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete user", error: err.message });
+  }
+});
+
+// Admin action logging
+router.post("/admin/log-action", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const action = new AdminAction({
+      adminId: req.userId,
+      action: req.body.action,
+      targetType: req.body.targetType,
+      targetId: req.body.targetId,
+      description: req.body.description
+    });
+
+    await action.save();
+    res.status(201).json(action);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to log admin action", error: err.message });
+  }
+});
+
+// Admin route to manage parts stock
+router.put("/admin/parts/:id/stock", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  const { stock } = req.body;
+
+  try {
+    const part = await Part.findByIdAndUpdate(
+      req.params.id,
+      { stock: parseInt(stock) },
+      { new: true }
+    );
+
+    if (!part) {
+      return res.status(404).json({ message: "Part not found" });
+    }
+
+    res.json({ message: "Stock updated successfully", part });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update stock", error: err.message });
+  }
+});
+
+// Admin route to view all part orders
+router.get("/admin/parts/orders", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  try {
+    const orders = await TrackingLog.find({})
+      .populate("p_id", "name description category price")
+      .populate("buyer_ID", "userName email phone")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch orders", error: err.message });
+  }
+});
+
+// Update order status (admin only)
+router.put("/admin/orders/:id/status", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+
+  const { status } = req.body;
+  const validStatuses = ["placed", "dispatched", "in transit", "delivered", "cancelled"];
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
+  try {
+    const order = await TrackingLog.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    ).populate("p_id", "name")
+     .populate("buyer_ID", "userName");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Update technician's partsOrdered array
+    await Technician.findOneAndUpdate(
+      { userId: order.buyer_ID._id, "partsOrdered.o_id": order._id },
+      { 
+        $set: { "partsOrdered.$.status": status }
+      }
+    );
+
+    res.json({ message: "Order status updated successfully", order });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update order status", error: err.message });
+  }
+});
+
+// ---------------- PARTS ----------------
+// Get parts for technicians to order
+router.get("/parts", verifyToken, async (req, res) => {
+  try {
+    const parts = await Part.find({ stock: { $gt: 0 } }).sort({ name: 1 });
+    res.json(parts);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch parts", error: err.message });
+  }
+});
+
+// Get technician's ordered parts
+router.get("/parts/orders", verifyToken, async (req, res) => {
   if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
 
   try {
-    const log = new TrackingLog({ buyer_ID: req.userId, ...req.body });
-    await log.save();
-    res.status(201).json(log);
+    const orders = await TrackingLog.find({ buyer_ID: req.userId })
+      .populate("p_id", "name description category")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: "Failed to place order" });
+    res.status(500).json({ message: "Failed to fetch orders", error: err.message });
+  }
+});
+
+// Order a part (technicians only)
+router.post("/parts/order", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+
+  const { p_id, status = 'placed' } = req.body;
+
+  try {
+    // Check if technician KYC is approved
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician || technician.kycStatus !== "approved") {
+      return res.status(403).json({ message: "KYC approval required to order parts" });
+    }
+
+    // Get part details
+    const part = await Part.findById(p_id);
+    if (!part) {
+      return res.status(404).json({ message: "Part not found" });
+    }
+
+    if (part.stock <= 0) {
+      return res.status(400).json({ message: "Part out of stock" });
+    }
+
+    // Create tracking log entry
+    const trackingLog = new TrackingLog({
+      p_id,
+      price: part.price,
+      status,
+      buyer_ID: req.userId,
+      trackingURL: `https://tracking.example.com/${Date.now()}`
+    });
+
+    await trackingLog.save();
+
+    // Decrease part stock
+    await Part.findByIdAndUpdate(p_id, { 
+      $inc: { stock: -1 } 
+    });
+
+    // Add to technician's partsOrdered array
+    await Technician.findOneAndUpdate(
+      { userId: req.userId },
+      {
+        $push: {
+          partsOrdered: {
+            o_id: trackingLog._id,
+            p_id: part._id,
+            p_name: part.name,
+            price: part.price,
+            status: status,
+            trackingURL: trackingLog.trackingURL
+          }
+        }
+      }
+    );
+
+    res.status(201).json({ 
+      message: "Part ordered successfully", 
+      order: trackingLog 
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to order part", error: err.message });
   }
 });
 

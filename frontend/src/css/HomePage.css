@@ -1,0 +1,102 @@
+.app {
+  font-family: sans-serif;
+  color: #333;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.logo {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.nav a {
+  margin-left: 1rem;
+  text-decoration: none;
+  color: #333;
+}
+
+.btn {
+  background: #2563eb;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: linear-gradient(to right, #3b82f6, #6366f1);
+  color: white;
+}
+
+.hero > h2{
+  size: 2rem;
+  font-weight: 600;
+}
+
+.hero-buttons {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  justify-content: center;
+}
+
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.card {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.card > h3{
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+}
+
+.footer {
+  text-align: center;
+  padding: 1rem;
+  background: #f9f9f9;
+  font-size: 0.9rem;
+}
+
+.tagline {
+  font-size: 1.4rem;
+  margin-top: 0.9rem;
+  margin-bottom: 1.2rem;
+  font-weight: 300;
+}
+
+.hero-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 2rem;
+}
+
+.hero-list li {
+  margin: 0.5rem 0;
+  font-size: 1rem;
+}
+
+
+a{
+  text-decoration: none;
+}

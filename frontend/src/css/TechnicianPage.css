@@ -1,0 +1,942 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.technician-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+}
+
+.technician-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.technician-header h1 {
+  color: #2c3e50;
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* Enhanced Tab Navigation */
+.technician-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.tech-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #2c3e50;
+  border: 2px solid rgba(44, 62, 80, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+  min-width: 100px;
+  font-size: 0.9rem;
+}
+
+.tech-tab:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #3498db;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.tech-tab.active {
+  background: #3498db;
+  color: white;
+  border-color: #3498db;
+  box-shadow: 0 5px 20px rgba(52, 152, 219, 0.3);
+  font-weight: 600;
+}
+
+.tab-icon {
+  font-size: 1.2rem;
+}
+
+.tab-text {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Tab Content */
+.tab-content {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+/* Parts Section */
+.parts-section {
+  margin-bottom: 25px;
+}
+
+.parts-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.no-parts {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+}
+
+.parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.part-card {
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.part-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #3498db;
+}
+
+.part-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.part-header h3 {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.part-price {
+  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.part-details {
+  margin-bottom: 15px;
+}
+
+.part-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.part-info label {
+  font-weight: 600;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+
+.part-info span {
+  color: #2c3e50;
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+}
+
+.part-info span.in-stock {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.part-info span.out-of-stock {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.order-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.order-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+}
+
+.order-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Orders Section */
+.orders-section {
+  margin-bottom: 25px;
+}
+
+.orders-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.no-orders {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+}
+
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.order-card {
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #f39c12;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.order-header h3 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.order-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.order-status.placed {
+  background: #3498db;
+  color: white;
+}
+
+.order-status.dispatched {
+  background: #f39c12;
+  color: white;
+}
+
+.order-status.in_transit {
+  background: #9b59b6;
+  color: white;
+}
+
+.order-status.delivered {
+  background: #27ae60;
+  color: white;
+}
+
+.order-status.cancelled {
+  background: #e74c3c;
+  color: white;
+}
+
+.order-details {
+  margin-bottom: 15px;
+}
+
+.order-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.order-info label {
+  font-weight: 600;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+
+.order-info span {
+  color: #2c3e50;
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+}
+
+.tracking-link {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.tracking-link:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+/* Enhanced existing styles */
+.loading-container, .error-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+/* KYC Status Styles */
+.kyc-status {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid;
+}
+
+.kyc-status.pending {
+  border-left-color: #f39c12;
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+}
+
+.kyc-status.rejected {
+  border-left-color: #e74c3c;
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+}
+
+.kyc-status.approved {
+  border-left-color: #27ae60;
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+}
+
+.kyc-status h2 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 1.5rem;
+}
+
+.kyc-status p {
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+/* KYC Upload Section */
+.kyc-upload-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.kyc-upload-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+}
+
+.kyc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.file-upload-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-upload-group label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.file-input {
+  padding: 10px;
+  border: 2px dashed #bdc3c7;
+  border-radius: 8px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.file-input:hover {
+  border-color: #3498db;
+}
+
+/* Profile Info Section */
+.profile-info-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-item label {
+  font-weight: 600;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.info-item span {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.pending {
+  background: #f39c12;
+  color: white;
+}
+
+.status-badge.approved {
+  background: #27ae60;
+  color: white;
+}
+
+.status-badge.rejected {
+  background: #e74c3c;
+  color: white;
+}
+
+.availability-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ecf0f1;
+}
+
+.availability-section h3 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+}
+
+.availability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.availability-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #3498db;
+}
+
+.availability-item label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.availability-item span {
+  color: #7f8c8d;
+}
+
+/* Profile Form Section */
+.profile-form-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.profile-form-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.checkbox-group {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 2px solid #ecf0f1;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.checkbox-label:hover {
+  border-color: #3498db;
+  background: #f8f9fa;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: #3498db;
+}
+
+.form-input {
+  padding: 12px 16px;
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Availability Form Styles */
+.availability-form {
+  margin-top: 15px;
+}
+
+.availability-form h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+}
+
+.availability-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.day-availability {
+  background: #f8f9fa;
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.day-availability:hover {
+  border-color: #3498db;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.day-label {
+  font-weight: 700;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.availability-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #7f8c8d;
+}
+
+.availability-toggle input[type="checkbox"] {
+  accent-color: #27ae60;
+  transform: scale(1.2);
+}
+
+.time-selectors {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.time-group label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.hour-select {
+  padding: 10px 12px;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.hour-select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  margin-top: 10px;
+}
+
+.submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+}
+
+/* Bookings Section */
+.bookings-section {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.bookings-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 10px;
+}
+
+.no-bookings {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+}
+
+.bookings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.booking-card {
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.booking-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.booking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.booking-header h3 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.booking-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.booking-status.pending {
+  background: #f39c12;
+  color: white;
+}
+
+.booking-status.accepted {
+  background: #3498db;
+  color: white;
+}
+
+.booking-status.in_progress {
+  background: #9b59b6;
+  color: white;
+}
+
+.booking-status.completed {
+  background: #27ae60;
+  color: white;
+}
+
+.booking-status.rejected {
+  background: #e74c3c;
+  color: white;
+}
+
+.booking-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-item label {
+  font-weight: 600;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.detail-item span {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn.accept {
+  background: #27ae60;
+  color: white;
+}
+
+.action-btn.reject {
+  background: #e74c3c;
+  color: white;
+}
+
+.action-btn.progress {
+  background: #9b59b6;
+  color: white;
+}
+
+.action-btn.complete {
+  background: #f39c12;
+  color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .technician-tabs {
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .tech-tab {
+    min-width: 80px;
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .technician-container {
+    padding: 10px;
+  }
+
+  .technician-header h1 {
+    font-size: 2rem;
+  }
+
+  .tab-content {
+    padding: 20px;
+  }
+
+  .parts-grid, .orders-grid, .bookings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .availability-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .time-selectors {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .day-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .technician-tabs {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tech-tab {
+    width: 200px;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .tab-text {
+    display: inline;
+  }
+
+  .part-header, .order-header, .booking-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .part-info, .order-info, .detail-item {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .day-availability {
+    padding: 15px;
+  }
+}
