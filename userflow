@@ -1,0 +1,286 @@
+# RepairNow App User Flow
+
+## Customer Side Flow
+
+### 1. Onboarding & Authentication
+- Splash Screen with RepairNow logo
+- Welcome Screen with brief app introduction
+- Registration/Login Screen
+  - Email/Password Registration
+  - Phone Number Verification
+  - Social Login Options
+  - User Role Selection (Customer)
+- Profile Setup
+  - Personal Information
+  - Address Information
+  - Profile Picture (Optional)
+
+### 2. Home Screen & Service Discovery
+- Dashboard with service categories
+  - AC Services
+  - Refrigerator Services
+  - Washing Machine Services
+  - Commercial AC Services
+  - Commercial Refrigeration Services
+- Search bar for quick service lookup
+- AI Assistant button for help with service selection
+- Promotional banners/offers
+- Quick access to ongoing bookings
+
+### 3. Service Selection Flow
+- Category Selection
+- Service Type Selection
+  - List of specific services with icons and base prices
+  - Service details with description
+- AI-assisted service recommendation based on problem description
+  - Text input for describing the issue
+  - AI suggests appropriate service categories
+  - Option to view all services if AI suggestions aren't helpful
+
+### 4. Booking Flow
+- Service Details Review
+- Schedule Selection
+  - Date picker
+  - Available time slots
+- Address Selection
+  - Saved addresses
+  - Add new address
+  - Map location picker
+- Issue Description
+  - Text description
+  - Option to upload photos of the issue
+- Technician Selection
+  - View available technicians with ratings
+  - Filter by experience, rating, price
+  - Option to request multiple quotations
+  - Compare technicians side by side
+- Booking Confirmation
+  - Service summary
+  - Price estimate
+  - Terms and conditions
+
+### 5. Booking Management
+- Active Bookings List
+- Booking Details Screen
+  - Service information
+  - Scheduled date and time
+  - Technician details with contact option
+  - Real-time technician location tracking
+  - Booking status updates
+  - Option to reschedule or cancel
+- In-app Chat with Technician
+- Real-time Notifications for booking updates
+
+### 6. Payment Flow
+- Payment Method Selection
+  - Credit/Debit Card
+  - UPI
+  - Wallet
+- Payment Confirmation
+- Receipt/Invoice Generation
+- Option to save payment method
+
+### 7. Post-Service Flow
+- Service Completion Confirmation
+- Rating and Review Submission
+  - Star rating
+  - Written feedback
+  - Photo upload option
+- View Service History
+- Generate and Download Invoice
+
+### 8. Account Management
+- Profile Management
+- Saved Addresses
+- Payment Methods
+- Notification Preferences
+- Help & Support
+- About RepairNow
+- Logout
+
+## Technician Side Flow
+
+### 1. Onboarding & Authentication
+- Splash Screen with RepairNow logo
+- Welcome Screen with brief app introduction
+- Registration/Login Screen
+  - Email/Password Registration
+  - Phone Number Verification
+  - User Role Selection (Technician)
+- Profile Setup
+  - Personal Information
+  - Professional Information
+    - Experience
+    - Specializations
+    - Service areas
+  - Document Upload for Verification
+    - ID Proof
+    - Professional Certifications
+  - Bank Account Details for Payments
+
+### 2. Home Screen & Job Management
+- Dashboard with key metrics
+  - Earnings summary
+  - Job completion rate
+  - Average rating
+  - Upcoming jobs
+- Active Jobs List
+- New Job Requests
+- AI Assistant button for troubleshooting help
+- Subscription status and benefits
+
+### 3. Job Request Flow
+- New Request Notification
+- Request Details Screen
+  - Service type
+  - Customer location
+  - Scheduled date and time
+  - Issue description
+  - Estimated earnings
+- Multiple Options:
+  - Accept Request
+  - Decline Request
+  - Propose Alternative Time
+  - Submit Custom Quotation
+
+### 4. Active Job Management
+- Job Details Screen
+  - Customer information
+  - Service details
+  - Location with navigation
+  - Issue description
+  - Contact customer option
+- Status Update Options
+  - En Route
+  - Arrived
+  - In Progress
+  - Completed
+  - Need Additional Time
+- AI-assisted Troubleshooting
+  - Input issue details
+  - Get step-by-step troubleshooting guidance
+  - Parts recommendation
+  - Estimated repair time
+
+### 5. Service Execution Flow
+- Pre-service Checklist
+- Spare Parts Management
+  - Check availability
+  - Request additional parts
+- Service Report Creation
+  - Issue diagnosis
+  - Work performed
+  - Parts replaced
+  - Photos before/after
+- Additional Charges (if applicable)
+  - Add extra parts or services
+  - Get customer approval
+- Service Completion
+  - Customer signature
+  - Payment collection
+  - Generate invoice
+
+### 6. Earnings & Payments
+- Earnings Dashboard
+  - Daily/Weekly/Monthly earnings
+  - Pending payments
+  - Completed jobs
+- Payment History
+- Withdraw Funds to Bank
+- Subscription Management
+  - Current plan
+  - Upgrade options
+  - Payment history
+
+### 7. Profile & Account Management
+- Profile Management
+- Service Area Management
+- Availability Settings
+  - Working hours
+  - Days off
+- Skill & Service Management
+- Ratings & Reviews
+- Help & Support
+- About RepairNow
+- Logout
+
+## Admin Dashboard Flow (Web-based)
+
+### 1. Authentication
+- Login Screen
+- Two-factor Authentication
+- Password Recovery
+
+### 2. Dashboard Overview
+- Key Metrics
+  - Total users (customers & technicians)
+  - Bookings (daily/weekly/monthly)
+  - Revenue
+  - Average ratings
+- Recent Activities
+- System Status
+
+### 3. User Management
+- Customer Management
+  - List view with search and filters
+  - Detailed profile view
+  - Edit/Block options
+- Technician Management
+  - List view with search and filters
+  - Verification status
+  - Performance metrics
+  - Edit/Block options
+- Admin User Management
+
+### 4. Service Management
+- Categories Management
+- Services Management
+  - Add/Edit/Delete services
+  - Set pricing
+  - Service availability
+
+### 5. Booking Management
+- All Bookings View
+  - Status filters
+  - Date range filters
+  - Search by ID/customer/technician
+- Booking Details
+  - Complete information
+  - Status updates
+  - Assignment changes
+  - Issue resolution
+
+### 6. Payment Management
+- Transaction History
+- Payment Status Management
+- Refund Processing
+- Revenue Reports
+
+### 7. Subscription Management
+- Plan Configuration
+- Subscriber Management
+- Payment Processing
+- Analytics
+
+### 8. Content Management
+- Promotional Banners
+- Notifications
+- Terms & Conditions
+- Privacy Policy
+- App Content
+
+### 9. Analytics & Reporting
+- User Analytics
+- Booking Analytics
+- Revenue Analytics
+- Technician Performance
+- Customer Satisfaction
+- AI Assistant Usage
+- Custom Report Generation
+
+### 10. System Configuration
+- App Settings
+- Notification Settings
+- Payment Gateway Configuration
+- API Keys Management
+- Backup & Restore
