@@ -31,6 +31,17 @@ const storage = multer.diskStorage({
   }
 });
 
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+           Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+           Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
 const upload = multer({ 
   storage: storage,
   limits: {
@@ -166,7 +177,106 @@ router.put("/me", verifyToken, async (req, res) => {
   }
 });
 
+// Update user location (for both customers and technicians)
+router.put("/location", verifyToken, async (req, res) => {
+  const { latitude, longitude, address } = req.body;
+  
+  if (!latitude || !longitude) {
+    return res.status(400).json({ message: "Latitude and longitude are required" });
+  }
+  
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        location: {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          address: address || ""
+        }
+      },
+      { new: true }
+    ).select("-password");
+    
+    // If user is a technician, also update technician service location
+    if (req.role === "technician") {
+      await Technician.findOneAndUpdate(
+        { userId: req.userId },
+        {
+          serviceLocation: {
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            serviceRadius: 10 // default 10km radius
+          }
+        }
+      );
+    }
+    
+    res.json({ message: "Location updated successfully", user: updatedUser });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update location", error: err.message });
+  }
+});
+
+
 // ---------------- TECHNICIANS ----------------
+
+
+router.get("/technicians/nearby", verifyToken, async (req, res) => {
+  if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
+  
+  const { latitude, longitude, radius = 25, expertise } = req.query;
+  try {
+    let query = { kycStatus: "approved" };
+    if (expertise) query.expertise = expertise;
+    
+    const technicians = await Technician.find(query).populate("userId", "userName email phone location");
+    
+    const nearbyTechnicians = technicians
+      .filter(tech => tech.serviceLocation?.latitude && tech.serviceLocation?.longitude)
+      .map(tech => ({
+        ...tech.toObject(),
+        distance: Math.round(calculateDistance(
+          parseFloat(latitude), parseFloat(longitude),
+          tech.serviceLocation.latitude, tech.serviceLocation.longitude
+        ) * 100) / 100
+      }))
+      .filter(tech => tech.distance <= Math.min(parseFloat(radius), tech.serviceLocation.serviceRadius))
+      .sort((a, b) => a.distance - b.distance);
+    
+    res.json(nearbyTechnicians);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch nearby technicians", error: err.message });
+  }
+});
+
+// Update technician service radius
+router.put("/technicians/service-radius", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+  
+  const { serviceRadius } = req.body;
+  
+  if (!serviceRadius || serviceRadius < 1 || serviceRadius > 50) {
+    return res.status(400).json({ message: "Service radius must be between 1 and 50 km" });
+  }
+  
+  try {
+    const technician = await Technician.findOneAndUpdate(
+      { userId: req.userId },
+      { "serviceLocation.serviceRadius": parseFloat(serviceRadius) },
+      { new: true }
+    );
+    
+    if (!technician) {
+      return res.status(404).json({ message: "Technician profile not found" });
+    }
+    
+    res.json({ message: "Service radius updated successfully", serviceRadius });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update service radius", error: err.message });
+  }
+});
+
 
 // Create / update technician profile
 router.post("/technicians", verifyToken, async (req, res) => {
@@ -267,6 +377,54 @@ router.post("/technicians/kyc", verifyToken, upload.fields([
   }
 });
 
+// Create flag (for customers and technicians)
+router.post("/bookings/:id/flag", verifyToken, async (req, res) => {
+  const { reason, description } = req.body;
+  
+  try {
+    // Verify booking exists and user has access
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Check if user is involved in the booking
+    if (booking.customerId.toString() !== req.userId && 
+        booking.technicianId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const flag = new Flag({
+      raisedBy: req.userId,
+      againstUser: req.userId === booking.customerId.toString() ? 
+                    booking.technicianId : booking.customerId,
+      reason,
+      description,
+      relatedBooking: req.params.id
+    });
+
+    await flag.save();
+    res.status(201).json({ message: "Flag raised successfully", flag });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to raise flag", error: err.message });
+  }
+});
+
+// Get user's flags
+router.get("/flags/my", verifyToken, async (req, res) => {
+  try {
+    const flags = await Flag.find({ raisedBy: req.userId })
+      .populate("againstUser", "userName email")
+      .populate("relatedBooking")
+      .sort({ createdAt: -1 });
+    
+    res.json(flags);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch flags", error: err.message });
+  }
+});
+
+
 // Update booking status (for technicians)
 router.put("/bookings/:id/status", verifyToken, async (req, res) => {
   if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
@@ -352,33 +510,37 @@ router.get("/bookings/customer", verifyToken, async (req, res) => {
 // Create a new booking
 router.post("/bookings", verifyToken, async (req, res) => {
   if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
-
-  const { technicianId, serviceType, scheduledDate, scheduledTime, address, description } = req.body;
-
+  
+  const { technicianId, serviceType, scheduledDate, scheduledTime, address, description, serviceLocation } = req.body;
+  
+  if (!serviceLocation?.latitude || !serviceLocation?.longitude) {
+    return res.status(400).json({ message: "Service location coordinates required" });
+  }
+  
   try {
-    // Check if technician exists and is approved
-    const technician = await Technician.findById(technicianId);
+    const technician = await Technician.findOne({ userId: technicianId });
     if (!technician || technician.kycStatus !== "approved") {
-      return res.status(400).json({ message: "Selected technician is not available" });
+      return res.status(400).json({ message: "Selected technician not available" });
     }
-
+    
+    let distance = null;
+    if (technician.serviceLocation) {
+      distance = Math.round(calculateDistance(
+        serviceLocation.latitude, serviceLocation.longitude,
+        technician.serviceLocation.latitude, technician.serviceLocation.longitude
+      ) * 100) / 100;
+    }
+    
     const booking = new Booking({
-      customerId: req.userId,
-      technicianId: technician.userId, // Store the user ID, not technician profile ID
-      serviceType,
-      scheduledDate,
-      scheduledTime,
-      address,
-      description,
-      status: "pending"
+      customerId: req.userId, technicianId, serviceType, scheduledDate, scheduledTime, 
+      address, description, serviceLocation, distance, status: "pending"
     });
-
+    
     await booking.save();
-
     const populatedBooking = await Booking.findById(booking._id)
       .populate("customerId", "userName email phone")
       .populate("technicianId", "userName email phone");
-
+    
     res.status(201).json(populatedBooking);
   } catch (err) {
     res.status(500).json({ message: "Failed to create booking", error: err.message });
@@ -495,6 +657,30 @@ router.put("/admin/technicians/:id/kyc", verifyToken, async (req, res) => {
   }
 });
 
+// Get KYC images for admin review
+router.get("/admin/technicians/:id/kyc-images", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+  
+  try {
+    const technician = await Technician.findById(req.params.id);
+    if (!technician) {
+      return res.status(404).json({ message: "Technician not found" });
+    }
+
+    // Return image file paths for the admin to view
+    const kycImages = {
+      IDImage: technician.IDImage ? `/uploads/${technician.IDImage}` : null,
+      Photo: technician.Photo ? `/uploads/${technician.Photo}` : null,
+      kycStatus: technician.kycStatus
+    };
+
+    res.json(kycImages);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch KYC images", error: err.message });
+  }
+});
+
+
 
 // Add these routes to your route.js file for admin functionality
 
@@ -512,6 +698,48 @@ router.get("/admin/technicians", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch technicians", error: err.message });
   }
 });
+
+// Admin cancel booking with reason
+router.put("/admin/bookings/:id/cancel", verifyToken, async (req, res) => {
+  if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+  
+  const { reason } = req.body;
+  if (!reason) {
+    return res.status(400).json({ message: "Cancellation reason is required" });
+  }
+
+  try {
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status: "cancelled",
+        cancellationReason: reason,
+        cancelledBy: req.userId,
+        cancelledAt: new Date()
+      },
+      { new: true }
+    ).populate("customerId", "userName email phone")
+     .populate("technicianId", "userName email phone");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Log admin action
+    await AdminAction.create({
+      adminId: req.userId,
+      action: "CANCEL_BOOKING",
+      targetType: "booking", 
+      targetId: booking._id,
+      description: `Cancelled booking with reason: ${reason}`
+    });
+
+    res.json({ message: "Booking cancelled successfully", booking });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to cancel booking", error: err.message });
+  }
+});
+
 
 // Get all users (admin only)
 router.get("/admin/users", verifyToken, async (req, res) => {

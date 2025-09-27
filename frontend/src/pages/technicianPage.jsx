@@ -1,5 +1,38 @@
 import React, { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import '../css/TechnicianPage.css';
+
+// Fix for default markers in React Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+// L.Icon.Default.mergeOptions({
+//   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+//   iconUrl: require('leaflet/dist/images/marker-icon.png'),
+//   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+// });
+
+// Custom icons for different types of markers
+const technicianIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDlDNSAxNC4yNSAxMiAyMiAxMiAyMkMxMiAyMiAxOSAxNC4yNSAxOSA5QzE5IDUuMTMgMTUuODcgMiAxMiAyWk0xMiAxMS41QzEwLjYyIDExLjUgOS41IDEwLjM4IDkuNSA5QzkuNSA3LjYyIDEwLjYyIDYuNSAxMiA2LjVDMTMuMzggNi41IDE0LjUgNy42MiAxNC41IDlDMTQuNSAxMC4zOCAxMy4zOCAxMS41IDEyIDExLjVaIiBmaWxsPSIjNDhCQjc4Ii8+Cjwvc3ZnPgo=',
+  iconSize: [25, 25],
+  iconAnchor: [12, 25],
+  popupAnchor: [0, -25],
+});
+
+const customerIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDlDNSAxNC4yNSAxMiAyMiAxMiAyMkMxMiAyMiAxOSAxNC4yNSAxOSA5QzE5IDUuMTMgMTUuODcgMiAxMiAyWk0xMiAxMS41QzEwLjYyIDExLjUgOS41IDEwLjM4IDkuNSA5QzkuNSA3LjYyIDEwLjYyIDYuNSAxMiA2LjVDMTMuMzggNi41IDE0LjUgNy42MiAxNC41IDlDMTQuNSAxMC4zOCAxMy4zOCAxMS41IDEyIDExLjVaIiBmaWxsPSIjNDA5OEUxIi8+Cjwvc3ZnPgo=',
+  iconSize: [25, 25],
+  iconAnchor: [12, 25],
+  popupAnchor: [0, -25],
+});
+
+const urgentRequestIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDlDNSAxNC4yNSAxMiAyMiAxMiAyMkMxMiAyMiAxOSAxNC4yNSAxOSA5QzE5IDUuMTMgMTUuODcgMiAxMiAyWk0xMiAxMS41QzEwLjYyIDExLjUgOS41IDEwLjM4IDkuNSA5QzkuNSA3LjYyIDEwLjYyIDYuNSAxMiA2LjVDMTMuMzggNi41IDE0LjUgNy42MiAxNC41IDlDMTQuNSAxMC4zOCAxMy4zOCAxMS41IDEyIDExLjVaIiBmaWxsPSIjRjU2NTY1Ii8+Cjwvc3ZnPgo=',
+  iconSize: [30, 30],
+  iconAnchor: [15, 30],
+  popupAnchor: [0, -30],
+});
 
 const TechnicianPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,6 +57,17 @@ const TechnicianPage = () => {
     saturday: { available: false, startHour: 9, endHour: 17 },
     sunday: { available: false, startHour: 9, endHour: 17 }
   });
+
+  // Booking filter state
+  const [bookingFilter, setBookingFilter] = useState('all');
+
+  // Map and location states
+  const [technicianLocation, setTechnicianLocation] = useState(null);
+  const [serviceRadius, setServiceRadius] = useState(10);
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [bookingRequests, setBookingRequests] = useState([]);
+  const [mapCenter, setMapCenter] = useState([28.6139, 77.2090]); // Default to Delhi
+  const [mapZoom, setMapZoom] = useState(10);
 
   const token = localStorage.getItem("token");
 
@@ -81,6 +125,96 @@ const TechnicianPage = () => {
     return `${formatHour(dayAvailability.startHour)} - ${formatHour(dayAvailability.endHour)}`;
   };
 
+  // Get technician location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          setTechnicianLocation(location);
+          setLocationPermission(true);
+          setMapCenter([location.latitude, location.longitude]);
+          setMapZoom(13);
+          updateTechnicianLocation(location);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Location access denied. Please enable location services to receive nearby booking requests.");
+          setLocationPermission(false);
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+      setLocationPermission(false);
+    }
+  };
+
+  // Update technician location in backend
+  const updateTechnicianLocation = async (location) => {
+    try {
+      const res = await fetch('http://localhost:8080/api/location', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address || ""
+        })
+      });
+
+      if (res.ok) {
+        console.log('Location updated successfully');
+      }
+    } catch (err) {
+      console.error('Error updating location:', err);
+    }
+  };
+
+  // Update service radius
+  const updateServiceRadius = async (radius) => {
+    try {
+      const res = await fetch('http://localhost:8080/api/technicians/service-radius', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ serviceRadius: radius })
+      });
+
+      if (res.ok) {
+        setServiceRadius(radius);
+        alert('Service radius updated successfully!');
+      } else {
+        alert('Failed to update service radius');
+      }
+    } catch (err) {
+      console.error('Error updating service radius:', err);
+    }
+  };
+
+  // Fetch booking requests with distance
+  const fetchBookingRequests = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/technicians/booking-requests", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const requests = await res.json();
+        setBookingRequests(requests);
+      }
+    } catch (err) {
+      console.error("Error fetching booking requests:", err);
+    }
+  };
+
   // Fetch all data
   useEffect(() => {
     const fetchAllData = async () => {
@@ -96,6 +230,14 @@ const TechnicianPage = () => {
         });
         const user = await userRes.json();
 
+        // Set user location if available
+        if (user.location && user.location.latitude && user.location.longitude) {
+          setTechnicianLocation(user.location);
+          setLocationPermission(true);
+          setMapCenter([user.location.latitude, user.location.longitude]);
+          setMapZoom(13);
+        }
+
         // Fetch technician profile
         const techRes = await fetch("http://localhost:8080/api/technicians", {
           headers: { Authorization: `Bearer ${token}` },
@@ -110,6 +252,11 @@ const TechnicianPage = () => {
             setExpertise(userTech.expertise || []);
             setServiceAreas(userTech.serviceAreas || []);
             setPricing(userTech.pricing || "");
+
+            // Set service radius if available
+            if (userTech.serviceLocation && userTech.serviceLocation.serviceRadius) {
+              setServiceRadius(userTech.serviceLocation.serviceRadius);
+            }
 
             // Handle availability
             if (userTech.availability) {
@@ -130,7 +277,11 @@ const TechnicianPage = () => {
                     };
                   }
                 } else {
-                  newAvailability[day] = { available: false, startHour: 9, endHour: 17 };
+                  newAvailability[day] = {
+                    available: false,
+                    startHour: 9,
+                    endHour: 17
+                  };
                 }
               });
               setAvailability(newAvailability);
@@ -141,12 +292,12 @@ const TechnicianPage = () => {
               await Promise.all([
                 fetchBookings(),
                 fetchParts(),
-                fetchOrderedParts()
+                fetchOrderedParts(),
+                fetchBookingRequests()
               ]);
             }
           }
         }
-
       } catch (err) {
         console.error("Error fetching data:", err);
       } finally {
@@ -163,7 +314,6 @@ const TechnicianPage = () => {
       const res = await fetch("http://localhost:8080/api/technicians/bookings", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (res.ok) {
         const bookingData = await res.json();
         setBookings(bookingData);
@@ -179,7 +329,6 @@ const TechnicianPage = () => {
       const res = await fetch("http://localhost:8080/api/parts", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (res.ok) {
         const partsData = await res.json();
         setParts(partsData);
@@ -195,7 +344,6 @@ const TechnicianPage = () => {
       const res = await fetch("http://localhost:8080/api/parts/orders", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (res.ok) {
         const ordersData = await res.json();
         setOrderedParts(ordersData);
@@ -214,10 +362,7 @@ const TechnicianPage = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          p_id: partId,
-          status: 'placed'
-        })
+        body: JSON.stringify({ p_id: partId, status: 'placed' })
       });
 
       if (res.ok) {
@@ -254,9 +399,7 @@ const TechnicianPage = () => {
     try {
       const res = await fetch("http://localhost:8080/api/technicians/kyc", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
 
@@ -329,6 +472,33 @@ const TechnicianPage = () => {
     }
   };
 
+  // Raise Flag Function
+  const raiseFlag = async (bookingId) => {
+    const reason = prompt('Please specify the reason for flagging:');
+    const description = prompt('Please provide additional details:');
+
+    if (!reason) return;
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/flag`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason, description })
+      });
+
+      if (res.ok) {
+        alert('Flag raised successfully!');
+      } else {
+        alert('Failed to raise flag');
+      }
+    } catch (err) {
+      console.error('Error raising flag:', err);
+    }
+  };
+
   const updateBookingStatus = async (bookingId, status) => {
     try {
       const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/status`, {
@@ -343,6 +513,7 @@ const TechnicianPage = () => {
       if (res.ok) {
         alert("Booking status updated successfully!");
         fetchBookings(); // Refresh bookings
+        fetchBookingRequests(); // Refresh booking requests
       } else {
         alert("Failed to update booking status");
       }
@@ -352,359 +523,438 @@ const TechnicianPage = () => {
     }
   };
 
-  if (loading) {
-    return <div className="loading-container">Loading...</div>;
-  }
+  // Filter bookings based on selected filter
+  const filteredBookings = bookings.filter(booking => {
+    if (bookingFilter === 'all') return true;
+    return booking.status === bookingFilter;
+  });
 
-  if (!token) {
-    return <div className="error-container">Please login to access this page.</div>;
-  }
-
-  // KYC Status Messages
-  const getKycStatusMessage = () => {
-    if (!techProfile) return null;
-
-    switch (techProfile.kycStatus) {
-      case "pending":
-        return (
-          <div className="kyc-status pending">
-            <h2>KYC Verification Required</h2>
-            <p>Your KYC verification is pending. Please submit your documents or wait for admin approval.</p>
-            <p>You cannot access bookings and parts until your KYC is approved.</p>
-          </div>
-        );
-      case "rejected":
-        return (
-          <div className="kyc-status rejected">
-            <h2>KYC Verification Rejected</h2>
-            <p>Your KYC verification was rejected. Please resubmit your documents.</p>
-            <p>You cannot access bookings and parts until your KYC is approved.</p>
-          </div>
-        );
-      case "approved":
-        return (
-          <div className="kyc-status approved">
-            <h2>KYC Verification Approved</h2>
-            <p>Your KYC is approved! You can now access all technician features.</p>
-          </div>
-        );
-      default:
-        return null;
-    }
+  // Get request urgency based on distance and time
+  const getRequestUrgency = (request) => {
+    if (!request.distance) return 'normal';
+    if (request.distance <= 5) return 'urgent';
+    if (request.distance <= 15) return 'medium';
+    return 'normal';
   };
 
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
+
   return (
-    <div className="technician-container">
-      <div className="technician-header">
-        <h1>Technician Dashboard</h1>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="technician-tabs">
-        {[
-          { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { key: 'profile', label: 'Profile', icon: '👤' },
-          ...(techProfile && techProfile.kycStatus === 'approved' ? [
-            { key: 'bookings', label: 'Bookings', icon: '📅' },
-            { key: 'parts', label: 'Parts', icon: '⚙️' },
-            { key: 'orders', label: 'My Orders', icon: '📦' }
-          ] : [])
-        ].map(tab => (
+    <div className="technician-page">
+      <nav className="technician-nav">
+        <div className="nav-brand">
+          <h2>Technician Panel</h2>
+        </div>
+        <div className="nav-tabs">
           <button 
-            key={tab.key}
-            className={`tech-tab ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
+            className={activeTab === 'dashboard' ? 'active' : ''} 
+            onClick={() => setActiveTab('dashboard')}
           >
-            <span className="tab-icon">{tab.icon}</span>
-            <span className="tab-text">{tab.label}</span>
+            🏠 Dashboard
           </button>
-        ))}
-      </div>
-
-      {/* KYC Status Section */}
-      {getKycStatusMessage()}
-
-      {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && (
-        <div className="tab-content">
-          {/* KYC Upload Form - only show if not approved */}
-          {techProfile && techProfile.kycStatus !== "approved" && (
-            <div className="kyc-upload-section">
-              <h2>Submit KYC Documents</h2>
-              <form className="kyc-form" onSubmit={handleKycSubmit}>
-                <div className="file-upload-group">
-                  <label htmlFor="IDImage">ID Document:</label>
-                  <input
-                    type="file"
-                    id="IDImage"
-                    name="IDImage"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    required
-                    className="file-input"
-                  />
-                </div>
-                <div className="file-upload-group">
-                  <label htmlFor="Photo">Photo:</label>
-                  <input
-                    type="file"
-                    id="Photo"
-                    name="Photo"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    required
-                    className="file-input"
-                  />
-                </div>
-                <button type="submit" className="submit-btn">Submit KYC Documents</button>
-              </form>
-            </div>
-          )}
-
-          {/* Profile Information */}
-          {techProfile && (
-            <div className="profile-info-section">
-              <h2>Profile Information</h2>
-              <div className="profile-info-grid">
-                <div className="info-item">
-                  <label>Expertise:</label>
-                  <span>{techProfile.expertise?.join(", ") || "Not specified"}</span>
-                </div>
-                <div className="info-item">
-                  <label>Service Areas:</label>
-                  <span>{techProfile.serviceAreas?.join(", ") || "Not specified"}</span>
-                </div>
-                <div className="info-item">
-                  <label>Pricing:</label>
-                  <span>${techProfile.pricing || "Not set"}</span>
-                </div>
-                <div className="info-item">
-                  <label>KYC Status:</label>
-                  <span className={`status-badge ${techProfile.kycStatus}`}>
-                    {techProfile.kycStatus || "Pending"}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <label>Average Rating:</label>
-                  <span>{techProfile.avgRating || "No ratings yet"}</span>
-                </div>
-                <div className="info-item">
-                  <label>Total Reviews:</label>
-                  <span>{techProfile.totalReviews || 0}</span>
-                </div>
-              </div>
-
-              <div className="availability-section">
-                <h3>Availability</h3>
-                <div className="availability-grid">
-                  {Object.entries(techProfile.availability || {}).map(([day, dayAvailability]) => (
-                    <div key={day} className="availability-item">
-                      <label>{day.charAt(0).toUpperCase() + day.slice(1)}:</label>
-                      <span>{formatAvailability(dayAvailability)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <button 
+            className={activeTab === 'bookings' ? 'active' : ''} 
+            onClick={() => setActiveTab('bookings')}
+          >
+            📋 Bookings
+          </button>
+          <button 
+            className={activeTab === 'requests' ? 'active' : ''} 
+            onClick={() => setActiveTab('requests')}
+          >
+            🗺️ Map Requests
+          </button>
+          <button 
+            className={activeTab === 'parts' ? 'active' : ''} 
+            onClick={() => setActiveTab('parts')}
+          >
+            🔧 Parts
+          </button>
+          <button 
+            className={activeTab === 'profile' ? 'active' : ''} 
+            onClick={() => setActiveTab('profile')}
+          >
+            👤 Profile
+          </button>
+          <button 
+            className="logout-btn" 
+            onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}
+          >
+            🚪 Logout
+          </button>
         </div>
-      )}
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="tab-content">
-          <div className="profile-form-section">
-            <h2>{techProfile ? "Update Profile" : "Complete Your Profile"}</h2>
-            <form className="profile-form" onSubmit={handleProfileSubmit}>
-              <div className="form-group">
-                <label>Expertise:</label>
-                <div className="checkbox-group">
-                  {["AC", "Refrigerator", "Washing Machine"].map(skill => (
-                    <label key={skill} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        value={skill}
-                        checked={expertise.includes(skill)}
-                        onChange={handleExpertiseChange}
-                      />
-                      <span>{skill}</span>
-                    </label>
-                  ))}
+      </nav>
+
+      <div className="technician-content">
+        {activeTab === 'dashboard' && (
+          <div className="dashboard-tab">
+            <div className="welcome-section">
+              <h1>Welcome, {techProfile?.userId?.userName || 'Technician'}!</h1>
+
+              {!techProfile && (
+                <div className="setup-prompt">
+                  <p>Please complete your profile setup to start receiving booking requests.</p>
                 </div>
-              </div>
+              )}
 
-              <div className="form-group">
-                <label htmlFor="serviceAreas">Service Areas (comma separated):</label>
-                <input
-                  type="text"
-                  id="serviceAreas"
-                  value={serviceAreas.join(", ")}
-                  onChange={handleServiceAreaChange}
-                  placeholder="e.g., Downtown, Suburbs, North Side"
-                  className="form-input"
-                />
-              </div>
+              {techProfile?.kycStatus === 'pending' && (
+                <div className="kyc-status pending">
+                  <p>Your KYC verification is pending. Please submit your documents or wait for admin approval.</p>
+                  <p>You cannot access bookings and parts until your KYC is approved.</p>
+                </div>
+              )}
 
-              <div className="form-group">
-                <label htmlFor="pricing">Hourly Pricing ($):</label>
-                <input
-                  type="number"
-                  id="pricing"
-                  value={pricing}
-                  onChange={(e) => setPricing(e.target.value)}
-                  placeholder="Enter hourly rate"
-                  className="form-input"
-                />
-              </div>
+              {techProfile?.kycStatus === 'rejected' && (
+                <div className="kyc-status rejected">
+                  <p>Your KYC verification was rejected. Please resubmit your documents.</p>
+                  <p>You cannot access bookings and parts until your KYC is approved.</p>
+                </div>
+              )}
 
-              <div className="availability-form">
-                <h3>Availability Schedule</h3>
-                <div className="availability-inputs">
-                  {Object.keys(availability).map(day => (
-                    <div key={day} className="day-availability">
-                      <div className="day-header">
-                        <label className="day-label">
-                          {day.charAt(0).toUpperCase() + day.slice(1)}
-                        </label>
-                        <label className="availability-toggle">
-                          <input
-                            type="checkbox"
-                            checked={availability[day].available}
-                            onChange={(e) => handleAvailabilityChange(day, 'available', e.target.checked)}
-                          />
-                          <span>Available</span>
-                        </label>
+              {techProfile?.kycStatus === 'approved' && (
+                <div className="kyc-status approved">
+                  <p>Your KYC is approved! You can now access all technician features.</p>
+
+                  <div className="location-section">
+                    <h3>📍 Location Settings</h3>
+                    {!locationPermission && (
+                      <div className="location-prompt">
+                        <p>Enable location access to receive nearby booking requests</p>
+                        <button className="location-btn" onClick={getCurrentLocation}>
+                          Enable Location
+                        </button>
                       </div>
+                    )}
 
-                      {availability[day].available && (
-                        <div className="time-selectors">
-                          <div className="time-group">
-                            <label>Start Hour:</label>
-                            <select
-                              value={availability[day].startHour}
-                              onChange={(e) => handleAvailabilityChange(day, 'startHour', e.target.value)}
-                              className="hour-select"
-                            >
-                              {hourOptions.map(hour => (
-                                <option key={hour} value={hour}>
-                                  {formatHour(hour)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                    {technicianLocation && (
+                      <div className="location-info">
+                        <p><strong>Current Location:</strong></p>
+                        <p>Latitude: {technicianLocation.latitude?.toFixed(6)}</p>
+                        <p>Longitude: {technicianLocation.longitude?.toFixed(6)}</p>
 
-                          <div className="time-group">
-                            <label>End Hour:</label>
-                            <select
-                              value={availability[day].endHour}
-                              onChange={(e) => handleAvailabilityChange(day, 'endHour', e.target.value)}
-                              className="hour-select"
-                            >
-                              {hourOptions.map(hour => (
-                                <option key={hour} value={hour}>
-                                  {formatHour(hour)}
-                                </option>
-                              ))}
-                            </select>
+                        <div className="service-radius">
+                          <h4>Service Radius</h4>
+                          <p>Current radius: {serviceRadius} km</p>
+                          <input
+                            type="range"
+                            min="1"
+                            max="50"
+                            value={serviceRadius}
+                            onChange={(e) => setServiceRadius(parseInt(e.target.value))}
+                          />
+                          <div className="radius-labels">
+                            <span>1km</span>
+                            <span>25km</span>
+                            <span>50km</span>
                           </div>
+                          <button onClick={() => updateServiceRadius(serviceRadius)}>
+                            Update Service Radius
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        <button onClick={getCurrentLocation}>
+                          🔄 Update Location
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {techProfile?.kycStatus === 'approved' && (
+              <div className="dashboard-stats">
+                <div className="stat-card">
+                  <h3>📋 Total Bookings</h3>
+                  <p>{bookings.length}</p>
+                </div>
+                <div className="stat-card">
+                  <h3>⏳ Pending Requests</h3>
+                  <p>{bookingRequests.length}</p>
+                </div>
+                <div className="stat-card">
+                  <h3>📦 Parts Ordered</h3>
+                  <p>{orderedParts.length}</p>
+                </div>
+                <div className="stat-card">
+                  <h3>⭐ Average Rating</h3>
+                  <p>{techProfile?.avgRating?.toFixed(1) || 'No ratings'}</p>
                 </div>
               </div>
-
-              <button type="submit" className="submit-btn">
-                {techProfile ? "Update Profile" : "Save Profile"}
-              </button>
-            </form>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bookings Tab - only show if KYC is approved */}
-      {activeTab === 'bookings' && techProfile && techProfile.kycStatus === "approved" && (
-        <div className="tab-content">
-          <div className="bookings-section">
-            <h2>My Bookings</h2>
-            {bookings.length === 0 ? (
-              <div className="no-bookings">
-                <p>No bookings yet.</p>
+        {activeTab === 'requests' && (
+          <div className="requests-tab">
+            <div className="requests-header">
+              <h2>🗺️ Map-Based Booking Requests</h2>
+              <p>View booking requests from customers in your service area with an interactive map</p>
+            </div>
+
+            {techProfile?.kycStatus !== 'approved' ? (
+              <div className="access-denied">
+                <p>KYC approval required to view booking requests.</p>
+              </div>
+            ) : !locationPermission ? (
+              <div className="location-required">
+                <p>📍 Location access is required to see nearby booking requests</p>
+                <button onClick={getCurrentLocation}>Enable Location</button>
               </div>
             ) : (
-              <div className="bookings-grid">
-                {bookings.map((booking) => (
+              <>
+                <div className="map-container">
+                  <MapContainer 
+                    center={mapCenter} 
+                    zoom={mapZoom} 
+                    style={{ height: '500px', width: '100%', borderRadius: '12px' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    {/* Technician location marker and service radius */}
+                    {technicianLocation && (
+                      <>
+                        <Marker 
+                          position={[technicianLocation.latitude, technicianLocation.longitude]} 
+                          icon={technicianIcon}
+                        >
+                          <Popup>
+                            <div className="popup-content">
+                              <h4>🔧 Your Location</h4>
+                              <p>You are here!</p>
+                              <p><strong>Service Radius:</strong> {serviceRadius} km</p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                        <Circle
+                          center={[technicianLocation.latitude, technicianLocation.longitude]}
+                          radius={serviceRadius * 1000} // Convert km to meters
+                          color="#48bb78"
+                          fillColor="#48bb78"
+                          fillOpacity={0.1}
+                        />
+                      </>
+                    )}
+
+                    {/* Customer request markers */}
+                    {bookingRequests.map(request => (
+                      request.serviceLocation && request.serviceLocation.latitude && request.serviceLocation.longitude && (
+                        <Marker
+                          key={request._id}
+                          position={[request.serviceLocation.latitude, request.serviceLocation.longitude]}
+                          icon={getRequestUrgency(request) === 'urgent' ? urgentRequestIcon : customerIcon}
+                        >
+                          <Popup>
+                            <div className="popup-content">
+                              <h4>🏠 Service Request</h4>
+                              <p><strong>Customer:</strong> {request.customerId?.userName}</p>
+                              <p><strong>Service:</strong> {request.serviceType}</p>
+                              <p><strong>Distance:</strong> {request.distance ? `${request.distance} km away` : 'Distance unknown'}</p>
+                              <p><strong>Urgency:</strong> {getRequestUrgency(request)}</p>
+                              <p><strong>Date:</strong> {new Date(request.scheduledDate).toLocaleDateString()}</p>
+                              <p><strong>Time:</strong> {request.scheduledTime}</p>
+                              <div className="popup-actions">
+                                <button 
+                                  className="popup-accept-btn"
+                                  onClick={() => updateBookingStatus(request._id, 'accepted')}
+                                >
+                                  ✅ Accept
+                                </button>
+                                <button 
+                                  className="popup-reject-btn"
+                                  onClick={() => updateBookingStatus(request._id, 'rejected')}
+                                >
+                                  ❌ Reject
+                                </button>
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      )
+                    ))}
+                  </MapContainer>
+                </div>
+
+                <div className="map-legend">
+                  <h4>Map Legend:</h4>
+                  <div className="legend-item">
+                    <span className="legend-icon technician">🔧</span>
+                    <span>Your Location</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-icon customer">🏠</span>
+                    <span>Service Requests</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-icon urgent">🚨</span>
+                    <span>Urgent Requests (≤5km)</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-icon radius">⭕</span>
+                    <span>Your Service Area ({serviceRadius}km)</span>
+                  </div>
+                </div>
+
+                <div className="booking-requests">
+                  <h3>📋 Booking Requests ({bookingRequests.length} pending)</h3>
+                  {bookingRequests.length === 0 ? (
+                    <div className="no-requests">
+                      <p>No booking requests in your area at the moment.</p>
+                      <button onClick={fetchBookingRequests}>🔄 Refresh Requests</button>
+                    </div>
+                  ) : (
+                    <div className="requests-list">
+                      {bookingRequests.map(request => (
+                        <div key={request._id} className={`request-card ${getRequestUrgency(request)}`}>
+                          <div className="request-header">
+                            <h4>Request #{request._id.slice(-6)}</h4>
+                            <div className="request-distance">
+                              {request.distance ? `📍 ${request.distance} km away` : '📍 Distance unknown'}
+                            </div>
+                          </div>
+
+                          <div className="request-details">
+                            <p><strong>👤 Customer:</strong> {request.customerId?.userName}</p>
+                            <p><strong>📞 Contact:</strong> {request.customerId?.phone}</p>
+                            <p><strong>🛠️ Service Type:</strong> {request.serviceType}</p>
+                            <p><strong>📅 Scheduled:</strong> {new Date(request.scheduledDate).toLocaleDateString()} at {request.scheduledTime}</p>
+                            <p><strong>📍 Address:</strong> {request.address}</p>
+                            {request.description && (
+                              <p><strong>📝 Description:</strong> {request.description}</p>
+                            )}
+                            <p><strong>🕒 Requested:</strong> {new Date(request.createdAt).toLocaleString()}</p>
+                            {getRequestUrgency(request) === 'urgent' && (
+                              <p className="urgency-note"><strong>🚨 Urgent:</strong> Very close to your location!</p>
+                            )}
+                          </div>
+
+                          <div className="request-actions">
+                            <button 
+                              className="accept-btn"
+                              onClick={() => updateBookingStatus(request._id, 'accepted')}
+                            >
+                              ✅ Accept Request
+                            </button>
+                            <button 
+                              className="reject-btn"
+                              onClick={() => updateBookingStatus(request._id, 'rejected')}
+                            >
+                              ❌ Reject Request
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'bookings' && (
+          <div className="bookings-tab">
+            <div className="bookings-header">
+              <h2>📋 My Bookings</h2>
+              <div className="booking-filters">
+                <select 
+                  value={bookingFilter} 
+                  onChange={(e) => setBookingFilter(e.target.value)}
+                >
+                  <option value="all">All Bookings</option>
+                  <option value="pending">Pending</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+
+            {techProfile?.kycStatus !== 'approved' ? (
+              <div className="access-denied">
+                <p>KYC approval required to view bookings.</p>
+              </div>
+            ) : filteredBookings.length === 0 ? (
+              <p className="no-bookings">No bookings found for the selected filter.</p>
+            ) : (
+              <div className="bookings-list">
+                {filteredBookings.map(booking => (
                   <div key={booking._id} className="booking-card">
                     <div className="booking-header">
-                      <h3>Booking #{booking._id.slice(-6)}</h3>
-                      <span className={`booking-status ${booking.status}`}>
-                        {booking.status.replace('_', ' ')}
+                      <h4>Booking #{booking._id.slice(-6)}</h4>
+                      <span className={`status-badge status-${booking.status}`}>
+                        {booking.status.toUpperCase()}
                       </span>
                     </div>
 
                     <div className="booking-details">
-                      <div className="detail-item">
-                        <label>Customer:</label>
-                        <span>{booking.customerId?.userName}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Service:</label>
-                        <span>{booking.serviceType}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Date:</label>
-                        <span>{new Date(booking.scheduledDate).toLocaleDateString()}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Time:</label>
-                        <span>{booking.scheduledTime}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Address:</label>
-                        <span>{booking.address}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Phone:</label>
-                        <span>{booking.customerId?.phone}</span>
-                      </div>
-                      <div className="detail-item">
-                        <label>Description:</label>
-                        <span>{booking.description}</span>
-                      </div>
+                      <p><strong>👤 Customer:</strong> {booking.customerId?.userName}</p>
+                      <p><strong>📞 Contact:</strong> {booking.customerId?.phone}</p>
+                      <p><strong>🛠️ Service Type:</strong> {booking.serviceType}</p>
+                      <p><strong>📅 Scheduled:</strong> {new Date(booking.scheduledDate).toLocaleDateString()} at {booking.scheduledTime}</p>
+                      <p><strong>📍 Address:</strong> {booking.address}</p>
+                      {booking.distance && (
+                        <p><strong>🚗 Distance:</strong> {booking.distance} km</p>
+                      )}
+                      {booking.description && (
+                        <p><strong>📝 Description:</strong> {booking.description}</p>
+                      )}
+                      <p><strong>🕒 Booked:</strong> {new Date(booking.createdAt).toLocaleString()}</p>
                     </div>
 
                     <div className="booking-actions">
-                      {booking.status === "pending" && (
+                      {booking.status === 'pending' && (
                         <>
                           <button 
-                            onClick={() => updateBookingStatus(booking._id, "accepted")}
-                            className="action-btn accept"
+                            onClick={() => updateBookingStatus(booking._id, 'accepted')}
+                            className="accept-btn"
                           >
-                            Accept
+                            ✅ Accept
                           </button>
                           <button 
-                            onClick={() => updateBookingStatus(booking._id, "rejected")}
-                            className="action-btn reject"
+                            onClick={() => updateBookingStatus(booking._id, 'rejected')}
+                            className="reject-btn"
                           >
-                            Reject
+                            ❌ Reject
                           </button>
                         </>
                       )}
 
-                      {booking.status === "accepted" && (
-                        <>
-                          <button 
-                            onClick={() => updateBookingStatus(booking._id, "in_progress")}
-                            className="action-btn progress"
-                          >
-                            Mark In Progress
-                          </button>
-                          <button 
-                            onClick={() => updateBookingStatus(booking._id, "completed")}
-                            className="action-btn complete"
-                          >
-                            Mark Complete
-                          </button>
-                        </>
+                      {booking.status === 'accepted' && (
+                        <button 
+                          onClick={() => updateBookingStatus(booking._id, 'in_progress')}
+                          className="start-btn"
+                        >
+                          🔧 Start Service
+                        </button>
+                      )}
+
+                      {booking.status === 'in_progress' && (
+                        <button 
+                          onClick={() => updateBookingStatus(booking._id, 'completed')}
+                          className="complete-btn"
+                        >
+                          ✅ Mark Completed
+                        </button>
+                      )}
+
+                      {['completed', 'rejected', 'cancelled'].includes(booking.status) && (
+                        <button 
+                          onClick={() => raiseFlag(booking._id)} 
+                          className="flag-btn"
+                        >
+                          🚩 Report Issue
+                        </button>
                       )}
                     </div>
                   </div>
@@ -712,114 +962,259 @@ const TechnicianPage = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Parts Tab - only show if KYC is approved */}
-      {activeTab === 'parts' && techProfile && techProfile.kycStatus === "approved" && (
-        <div className="tab-content">
-          <div className="parts-section">
-            <h2>Available Parts</h2>
-            {parts.length === 0 ? (
-              <div className="no-parts">
-                <p>No parts available.</p>
+        {activeTab === 'parts' && (
+          <div className="parts-tab">
+            <h2>🔧 Parts Management</h2>
+
+            {techProfile?.kycStatus !== 'approved' ? (
+              <div className="access-denied">
+                <p>KYC approval required to access parts.</p>
               </div>
             ) : (
-              <div className="parts-grid">
-                {parts.map((part) => (
-                  <div key={part._id} className="part-card">
-                    <div className="part-header">
-                      <h3>{part.name}</h3>
-                      <span className="part-price">${part.price}</span>
-                    </div>
-
-                    <div className="part-details">
-                      <div className="part-info">
-                        <label>Category:</label>
-                        <span>{part.category}</span>
-                      </div>
-                      <div className="part-info">
-                        <label>Stock:</label>
-                        <span className={part.stock > 0 ? 'in-stock' : 'out-of-stock'}>
-                          {part.stock} available
-                        </span>
-                      </div>
-                      <div className="part-info">
-                        <label>Description:</label>
-                        <span>{part.description}</span>
-                      </div>
-                      {part.supplier && (
-                        <div className="part-info">
-                          <label>Supplier:</label>
-                          <span>{part.supplier}</span>
+              <>
+                <div className="parts-section">
+                  <h3>Available Parts</h3>
+                  {parts.length === 0 ? (
+                    <p>No parts available.</p>
+                  ) : (
+                    <div className="parts-grid">
+                      {parts.map(part => (
+                        <div key={part._id} className="part-card">
+                          <h4>{part.name}</h4>
+                          <p><strong>Category:</strong> {part.category}</p>
+                          <p><strong>Brand:</strong> {part.brand}</p>
+                          <p><strong>Price:</strong> ₹{part.price}</p>
+                          <p><strong>Stock:</strong> {part.stock}</p>
+                          {part.description && <p><strong>Description:</strong> {part.description}</p>}
+                          <button 
+                            onClick={() => orderPart(part._id)}
+                            disabled={part.stock === 0}
+                            className="order-btn"
+                          >
+                            {part.stock === 0 ? 'Out of Stock' : 'Order Part'}
+                          </button>
                         </div>
-                      )}
+                      ))}
                     </div>
+                  )}
+                </div>
 
-                    <button 
-                      className="order-btn"
-                      onClick={() => orderPart(part._id)}
-                      disabled={part.stock === 0}
-                    >
-                      {part.stock > 0 ? 'Order Part' : 'Out of Stock'}
-                    </button>
-                  </div>
-                ))}
-              </div>
+                <div className="ordered-parts-section">
+                  <h3>My Orders</h3>
+                  {orderedParts.length === 0 ? (
+                    <p>No orders yet.</p>
+                  ) : (
+                    <div className="orders-table">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Order ID</th>
+                            <th>Part Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Order Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orderedParts.map(order => (
+                            <tr key={order._id}>
+                              <td>#{order._id.slice(-6)}</td>
+                              <td>{order.partId?.name}</td>
+                              <td>{order.partId?.category}</td>
+                              <td>₹{order.partId?.price}</td>
+                              <td>
+                                <span className={`status-badge status-${order.status}`}>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Orders Tab - only show if KYC is approved */}
-      {activeTab === 'orders' && techProfile && techProfile.kycStatus === "approved" && (
-        <div className="tab-content">
-          <div className="orders-section">
-            <h2>My Part Orders</h2>
-            {orderedParts.length === 0 ? (
-              <div className="no-orders">
-                <p>No orders yet.</p>
+        {activeTab === 'profile' && (
+          <div className="profile-tab">
+            <h2>👤 Profile Management</h2>
+
+            {!techProfile ? (
+              <div className="kyc-section">
+                <h3>📋 KYC Verification</h3>
+                <p>Please upload your KYC documents to get approved as a technician.</p>
+
+                <form onSubmit={handleKycSubmit} className="kyc-form">
+                  <div className="form-group">
+                    <label>ID Proof (Aadhar/License/etc.):</label>
+                    <input 
+                      type="file" 
+                      name="IDImage" 
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Your Photo:</label>
+                    <input 
+                      type="file" 
+                      name="Photo" 
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="submit-kyc-btn">
+                    📤 Submit KYC Documents
+                  </button>
+                </form>
+              </div>
+            ) : techProfile.kycStatus === 'rejected' ? (
+              <div className="kyc-section">
+                <h3>📋 Resubmit KYC Documents</h3>
+                <p>Your KYC was rejected. Please upload new documents.</p>
+
+                <form onSubmit={handleKycSubmit} className="kyc-form">
+                  <div className="form-group">
+                    <label>ID Proof (Aadhar/License/etc.):</label>
+                    <input 
+                      type="file" 
+                      name="IDImage" 
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Your Photo:</label>
+                    <input 
+                      type="file" 
+                      name="Photo" 
+                      onChange={handleFileChange}
+                      accept="image/*"
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="submit-kyc-btn">
+                    📤 Resubmit KYC Documents
+                  </button>
+                </form>
               </div>
             ) : (
-              <div className="orders-grid">
-                {orderedParts.map((order) => (
-                  <div key={order._id} className="order-card">
-                    <div className="order-header">
-                      <h3>Order #{order._id.slice(-6)}</h3>
-                      <span className={`order-status ${order.status}`}>
-                        {order.status.replace('_', ' ')}
-                      </span>
-                    </div>
-
-                    <div className="order-details">
-                      <div className="order-info">
-                        <label>Part:</label>
-                        <span>{order.p_id?.name || 'Part Name'}</span>
-                      </div>
-                      <div className="order-info">
-                        <label>Price:</label>
-                        <span>${order.price || order.p_id?.price}</span>
-                      </div>
-                      <div className="order-info">
-                        <label>Order Date:</label>
-                        <span>{new Date(order.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {order.trackingURL && (
-                        <div className="order-info">
-                          <label>Tracking:</label>
-                          <a href={order.trackingURL} target="_blank" rel="noopener noreferrer" className="tracking-link">
-                            Track Order
-                          </a>
-                        </div>
-                      )}
+              <div className="profile-form-section">
+                <h3>Profile Information</h3>
+                <form onSubmit={handleProfileSubmit} className="profile-form">
+                  <div className="form-group">
+                    <label>Expertise:</label>
+                    <div className="checkbox-group">
+                      {['AC', 'Refrigerator', 'Washing Machine'].map(skill => (
+                        <label key={skill} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            value={skill}
+                            checked={expertise.includes(skill)}
+                            onChange={handleExpertiseChange}
+                          />
+                          {skill}
+                        </label>
+                      ))}
                     </div>
                   </div>
-                ))}
+
+                  <div className="form-group">
+                    <label>Service Areas (comma-separated):</label>
+                    <input
+                      type="text"
+                      value={serviceAreas.join(', ')}
+                      onChange={handleServiceAreaChange}
+                      placeholder="e.g., Downtown, Uptown, City Center"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Pricing per Service (₹):</label>
+                    <input
+                      type="number"
+                      value={pricing}
+                      onChange={(e) => setPricing(e.target.value)}
+                      placeholder="Enter your service charge"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="availability-section">
+                    <h4>Weekly Availability:</h4>
+                    {Object.keys(availability).map(day => (
+                      <div key={day} className="day-availability-form">
+                        <h5>{day.charAt(0).toUpperCase() + day.slice(1)}</h5>
+                        <div className="availability-controls">
+                          <label className="checkbox-label">
+                            <input
+                              type="checkbox"
+                              checked={availability[day].available}
+                              onChange={(e) => handleAvailabilityChange(day, 'available', e.target.checked)}
+                            />
+                            Available
+                          </label>
+
+                          {availability[day].available && (
+                            <div className="time-controls">
+                              <label>From:</label>
+                              <select
+                                value={availability[day].startHour}
+                                onChange={(e) => handleAvailabilityChange(day, 'startHour', e.target.value)}
+                              >
+                                {hourOptions.map(hour => (
+                                  <option key={hour} value={hour}>
+                                    {formatHour(hour)}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <label>To:</label>
+                              <select
+                                value={availability[day].endHour}
+                                onChange={(e) => handleAvailabilityChange(day, 'endHour', e.target.value)}
+                              >
+                                {hourOptions.map(hour => (
+                                  <option key={hour} value={hour}>
+                                    {formatHour(hour)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button type="submit" className="save-profile-btn">
+                    💾 Save Profile
+                  </button>
+                </form>
+
+                <div className="profile-info">
+                  <h4>Current Profile Status</h4>
+                  <p><strong>KYC Status:</strong> {techProfile.kycStatus}</p>
+                  <p><strong>Average Rating:</strong> {techProfile.avgRating?.toFixed(1) || 'No ratings'}</p>
+                  <p><strong>Total Reviews:</strong> {techProfile.totalReviews || 0}</p>
+                  <p><strong>Member Since:</strong> {new Date(techProfile.createdAt).toLocaleDateString()}</p>
+                </div>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useRef} from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import '../css/CustomerPage.css';
+
+
+// Fix for default markers in React Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+// L.Icon.Default.mergeOptions({
+//   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+//   iconUrl: require('leaflet/dist/images/marker-icon.png'),
+//   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+// });
+
+// Custom icons for different types of markers
+const customerIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDlDNSAxNC4yNSAxMiAyMiAxMiAyMkMxMiAyMiAxOSAxNC4yNSAxOSA5QzE5IDUuMTMgMTUuODcgMiAxMiAyWk0xMiAxMS41QzEwLjYyIDExLjUgOS41IDEwLjM4IDkuNSA5QzkuNSA3LjYyIDEwLjYyIDYuNSAxMiA2LjVDMTMuMzggNi41IDE0LjUgNy42MiAxNC41IDlDMTQuNSAxMC4zOCAxMy4zOCAxMS41IDEyIDExLjVaIiBmaWxsPSIjNDA5OEUxIi8+Cjwvc3ZnPgo=',
+  iconSize: [25, 25],
+  iconAnchor: [12, 25],
+  popupAnchor: [0, -25],
+});
+
+const technicianIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDlDNSAxNC4yNSAxMiAyMiAxMiAyMkMxMiAyMiAxOSAxNC4yNSAxOSA5QzE5IDUuMTMgMTUuODcgMiAxMiAyWk0xMiAxMS41QzEwLjYyIDExLjUgOS41IDEwLjM4IDkuNSA5QzkuNSA3LjYyIDEwLjYyIDYuNSAxMiA2LjVDMTMuMzggNi41IDE0LjUgNy42MiAxNC41IDlDMTQuNSAxMC4zOCAxMy4zOCAxMS41IDEyIDExLjVaIiBmaWxsPSIjNDhCQjc4Ii8+Cjwvc3ZnPgo=',
+  iconSize: [25, 25],
+  iconAnchor: [12, 25],
+  popupAnchor: [0, -25],
+});
 
 const CustomerPage = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -30,6 +57,26 @@ const CustomerPage = () => {
     email: '',
     phone: ''
   });
+
+  // Map and location states
+  const [userLocation, setUserLocation] = useState(null);
+  const [mapTechnicians, setMapTechnicians] = useState([]);
+  const [showMap, setShowMap] = useState(false);
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [mapCenter, setMapCenter] = useState([28.6139, 77.2090]); // Default to Delhi
+  const [mapZoom, setMapZoom] = useState(10);
+  const [searchRadius, setSearchRadius] = useState(25);
+
+  const [chatMessages, setChatMessages] = useState([
+  {
+    type: "assistant",
+    text: `Hello! I’m **Repair Hero** 🔧.\n\nDescribe any AC, Washing-Machine or Refrigerator problem and I’ll reply with:\n• 🔧 Issue diagnosis\n• 👨‍🔧 Technician type\n• 💰 INR cost estimate\n• 💡 Quick tips`,
+    ts: Date.now()
+  }
+]);
+const [chatInput, setChatInput]   = useState("");
+const [isTyping,  setIsTyping]    = useState(false);
+const chatEndRef = useRef(null);
 
   const token = localStorage.getItem('token');
 
@@ -79,9 +126,9 @@ const CustomerPage = () => {
         const res = await fetch('http://localhost:8080/api/bookings/customer', {
           headers: { Authorization: `Bearer ${token}` }
         });
+
         if (res.ok) {
           const bookingData = await res.json();
-
           // Check for status changes and show notifications
           if (bookings.length > 0) {
             bookingData.forEach(newBooking => {
@@ -99,7 +146,6 @@ const CustomerPage = () => {
               }
             });
           }
-
           setBookings(bookingData);
         }
       } catch (err) {
@@ -109,7 +155,6 @@ const CustomerPage = () => {
 
     // Poll every 30 seconds for real-time updates
     const interval = setInterval(pollBookings, 30000);
-
     return () => clearInterval(interval);
   }, [token, bookings]);
 
@@ -124,25 +169,21 @@ const CustomerPage = () => {
   // Helper function to format availability for display
   const formatAvailability = (dayAvailability) => {
     if (!dayAvailability) return "Not available";
-
     // Handle both old string format and new object format
     if (typeof dayAvailability === 'string') {
       return dayAvailability;
     }
-
     if (typeof dayAvailability === 'object' && dayAvailability.available) {
       const startHour = dayAvailability.startHour || 0;
       const endHour = dayAvailability.endHour || 23;
       return `${formatHour(startHour)} - ${formatHour(endHour)}`;
     }
-
     return "Not available";
   };
 
   // Helper function to get available days for a technician
   const getAvailableDaysCount = (availability) => {
     if (!availability) return 0;
-
     return Object.values(availability).filter(dayAvail => {
       if (typeof dayAvail === 'string') {
         return dayAvail !== "Not available" && dayAvail.trim() !== "";
@@ -150,6 +191,151 @@ const CustomerPage = () => {
       return dayAvail && dayAvail.available;
     }).length;
   };
+
+  // Get user location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          setUserLocation(location);
+          setLocationPermission(true);
+          setMapCenter([location.latitude, location.longitude]);
+          setMapZoom(13);
+          updateUserLocation(location);
+          fetchNearbyTechnicians(location);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Location access denied. Please enable location services to find nearby technicians.");
+          setLocationPermission(false);
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+      setLocationPermission(false);
+    }
+  };
+
+  // Update user location in backend
+  const updateUserLocation = async (location) => {
+    try {
+      const res = await fetch('http://localhost:8080/api/location', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address || ""
+        })
+      });
+
+      if (res.ok) {
+        console.log('Location updated successfully');
+      }
+    } catch (err) {
+      console.error('Error updating location:', err);
+    }
+  };
+
+  // Fetch nearby technicians
+  const fetchNearbyTechnicians = async (location) => {
+    try {
+      const res = await fetch(
+        `http://localhost:8080/api/technicians/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${searchRadius}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (res.ok) {
+        const nearbyTechs = await res.json();
+        setMapTechnicians(nearbyTechs);
+      }
+    } catch (err) {
+      console.error('Error fetching nearby technicians:', err);
+    }
+  };
+
+const sendToRepairHero = async (msg) => {
+  if (!msg.trim()) return;
+
+  // Push user line
+  setChatMessages(prev => [
+    ...prev,
+    { type: "user", text: msg.trim(), ts: Date.now() }
+  ]);
+  setChatInput("");
+  setIsTyping(true);
+
+  try {
+    // Build system prompt + last 6 turns
+    const history = chatMessages.slice(-6).map(m =>
+      (m.type === "user" ? "User: " : "Repair Hero: ") + m.text
+    ).join("\n");
+
+    const prompt = [
+      `You are Repair Hero, an appliance-repair expert.`,
+      `Only discuss AC, Washing-Machine or Refrigerator issues.`,
+      `Always answer with:\n🔧 Issue Diagnosis\n👨‍🔧 Technician Type\n💰 Estimated Cost (INR)\n💡 Quick Tips`,
+      history,
+      `User: ${msg.trim()}`,
+      `Repair Hero:`
+    ].join("\n");
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }]
+            }
+          ]
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API error ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+    const aiText =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Sorry, I couldn’t process that.";
+
+    setChatMessages(prev => [
+      ...prev,
+      { type: "assistant", text: aiText, ts: Date.now() }
+    ]);
+  } catch (err) {
+    console.error("sendToRepairHero error:", err);
+    setChatMessages(prev => [
+      ...prev,
+      { type: "assistant", text: "⚠️ Network/API error – please try again.", ts: Date.now() }
+    ]);
+  } finally {
+    setIsTyping(false);
+  }
+};
+
+const handleKey = e => {
+  if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendToRepairHero(chatInput); }
+};
+
 
   // Fetch initial data
   useEffect(() => {
@@ -172,6 +358,15 @@ const CustomerPage = () => {
             email: userData.email || '',
             phone: userData.phone || ''
           });
+
+          // Set user location if available
+          if (userData.location && userData.location.latitude && userData.location.longitude) {
+            setUserLocation(userData.location);
+            setLocationPermission(true);
+            setMapCenter([userData.location.latitude, userData.location.longitude]);
+            setMapZoom(13);
+            fetchNearbyTechnicians(userData.location);
+          }
         }
 
         // Fetch approved technicians
@@ -193,7 +388,6 @@ const CustomerPage = () => {
           const bookingData = await bookingRes.json();
           setBookings(bookingData);
         }
-
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally {
@@ -208,10 +402,8 @@ const CustomerPage = () => {
   const filteredTechnicians = technicians.filter(tech => {
     const matchesExpertise = !searchFilters.expertise || 
       tech.expertise?.some(exp => exp.toLowerCase().includes(searchFilters.expertise.toLowerCase()));
-
     const matchesLocation = !searchFilters.location || 
       tech.serviceAreas?.some(area => area.toLowerCase().includes(searchFilters.location.toLowerCase()));
-
     const matchesRating = tech.avgRating >= searchFilters.minRating;
 
     return matchesExpertise && matchesLocation && matchesRating;
@@ -228,18 +420,43 @@ const CustomerPage = () => {
     });
   };
 
+  // Handle technician selection from map
+  const handleMapTechnicianSelection = (technicianId) => {
+    const tech = mapTechnicians.find(t => t._id === technicianId);
+    setSelectedTechnician(tech);
+    setBookingForm({
+      ...bookingForm,
+      technicianId,
+      serviceType: ''
+    });
+    setActiveTab('assistant'); // Switch to booking tab
+  };
+
   // Handle booking submission
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
 
+    if (!userLocation) {
+      alert('Please enable location services to book a technician');
+      return;
+    }
+
     try {
+      const bookingData = {
+        ...bookingForm,
+        serviceLocation: {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude
+        }
+      };
+
       const res = await fetch('http://localhost:8080/api/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(bookingForm)
+        body: JSON.stringify(bookingData)
       });
 
       if (res.ok) {
@@ -253,6 +470,7 @@ const CustomerPage = () => {
           description: ''
         });
         setSelectedTechnician(null);
+
         // Refresh bookings
         const bookingRes = await fetch('http://localhost:8080/api/bookings/customer', {
           headers: { Authorization: `Bearer ${token}` }
@@ -273,7 +491,6 @@ const CustomerPage = () => {
   // Handle profile update
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-
     try {
       const res = await fetch('http://localhost:8080/api/me', {
         method: 'PUT',
@@ -338,86 +555,129 @@ const CustomerPage = () => {
     }
   };
 
-  if (loading) {
-    return <div className="loading-container">Loading...</div>;
-  }
+  // Raise Flag Function
+  const raiseFlag = async (bookingId) => {
+    const reason = prompt('Please specify the reason for flagging:');
+    const description = prompt('Please provide additional details:');
 
-  if (!token) {
-    return <div className="error-container">Please login to access this page.</div>;
+    if (!reason) return;
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/flag`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason, description })
+      });
+
+      if (res.ok) {
+        alert('Flag raised successfully!');
+      } else {
+        alert('Failed to raise flag');
+      }
+    } catch (err) {
+      console.error('Error raising flag:', err);
+    }
+  };
+
+  // Handle search radius change
+  const handleRadiusChange = (newRadius) => {
+    setSearchRadius(newRadius);
+    if (userLocation) {
+      fetchNearbyTechnicians(userLocation);
+    }
+  };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
   }
 
   return (
-    <div className="customer-container">
-      <div className="customer-header">
-        <h1>Customer Dashboard</h1>
-        <p>Welcome, {userProfile?.userName || 'Customer'}!</p>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="tab-navigation">
-        {[
-          { key: 'home', label: 'Home', icon: '🏠' },
-          { key: 'assistant', label: 'Book Service', icon: '📅' },
-          { key: 'bookings', label: 'My Bookings', icon: '📋' },
-          { key: 'profile', label: 'Profile', icon: '👤' }
-        ].map(tab => (
+    <div className="customer-page">
+      <nav className="customer-nav">
+        <div className="nav-brand">
+          <h2>Customer Panel</h2>
+        </div>
+        <div className="nav-tabs">
           <button 
-            key={tab.key}
-            className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
+            className={activeTab === 'home' ? 'active' : ''} 
+            onClick={() => setActiveTab('home')}
           >
-            <span className="tab-icon">{tab.icon}</span>
-            <span className="tab-label">{tab.label}</span>
+            🏠 Home
           </button>
-        ))}
-      </div>
+          <button
+            className={activeTab==="chat" ? "active":""}
+            onClick={() => setActiveTab("chat")}
+          >
+            🤖 Repair Hero
+          </button>
+          <button 
+            className={activeTab === 'map' ? 'active' : ''} 
+            onClick={() => setActiveTab('map')}
+          >
+            🗺️ Find Nearby
+          </button>
+          <button 
+            className={activeTab === 'assistant' ? 'active' : ''} 
+            onClick={() => setActiveTab('assistant')}
+          >
+            🛠️ Book Service
+          </button>
+          <button 
+            className={activeTab === 'bookings' ? 'active' : ''} 
+            onClick={() => setActiveTab('bookings')}
+          >
+            📋 My Bookings
+          </button>
+          <button 
+            className={activeTab === 'profile' ? 'active' : ''} 
+            onClick={() => setActiveTab('profile')}
+          >
+            👤 Profile
+          </button>
+          <button 
+            className="logout-btn" 
+            onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}
+          >
+            🚪 Logout
+          </button>
+        </div>
+      </nav>
 
-      {/* Home Tab - Browse Technicians */}
-      {activeTab === 'home' && (
-        <div className="tab-content">
-          <div className="section-header">
-            <h2>Find Technicians</h2>
-            <p>Browse and book qualified technicians in your area</p>
-          </div>
+      <div className="customer-content">
+        {activeTab === 'home' && (
+          <div className="home-tab">
+            <div className="welcome-section">
+              <h1>Welcome, {userProfile?.userName || 'Customer'}!</h1>
+              <p>Browse and book qualified technicians in your area</p>
+            </div>
 
-          {/* Search Filters */}
-          <div className="filters-section">
-            <h3>Search Filters</h3>
-            <div className="filters-grid">
-              <div className="filter-group">
-                <label htmlFor="expertise">Expertise:</label>
+            <div className="search-filters">
+              <h3>🔍 Find Technicians</h3>
+              <div className="filter-row">
                 <select 
-                  id="expertise"
-                  value={searchFilters.expertise}
+                  value={searchFilters.expertise} 
                   onChange={(e) => setSearchFilters({...searchFilters, expertise: e.target.value})}
-                  className="filter-select"
                 >
                   <option value="">All Services</option>
                   <option value="AC">AC Repair</option>
                   <option value="Refrigerator">Refrigerator Repair</option>
                   <option value="Washing Machine">Washing Machine Repair</option>
                 </select>
-              </div>
-
-              <div className="filter-group">
-                <label htmlFor="location">Location:</label>
-                <input
-                  type="text"
-                  id="location"
-                  placeholder="Enter location"
+                <input 
+                  type="text" 
+                  placeholder="Location/Area" 
                   value={searchFilters.location}
                   onChange={(e) => setSearchFilters({...searchFilters, location: e.target.value})}
-                  className="filter-input"
                 />
-              </div>
-
-              <div className="filter-group">
-                <label htmlFor="minRating">Minimum Rating:</label>
                 <select 
-                  id="minRating"
-                  value={searchFilters.minRating}
+                  value={searchFilters.minRating} 
                   onChange={(e) => setSearchFilters({...searchFilters, minRating: parseFloat(e.target.value)})}
-                  className="filter-select"
                 >
                   <option value={0}>Any Rating</option>
                   <option value={3}>3+ Stars</option>
@@ -426,396 +686,489 @@ const CustomerPage = () => {
                 </select>
               </div>
             </div>
-          </div>
 
-          {/* Technicians List */}
-          <div className="technicians-section">
-            <div className="section-header">
-              <h3>Available Technicians ({filteredTechnicians.length})</h3>
-            </div>
-            {filteredTechnicians.length === 0 ? (
-              <div className="no-results">
-                <p>No technicians found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="technicians-grid">
-                {filteredTechnicians.map((tech) => (
+            <div className="technicians-grid">
+              <h3>📋 Available Technicians</h3>
+              <p>Browse and book qualified technicians in your area</p>
+
+              {filteredTechnicians.length === 0 ? (
+                <p className="no-technicians">No technicians found matching your criteria.</p>
+              ) : (
+                filteredTechnicians.map(tech => (
                   <div key={tech._id} className="technician-card">
                     <div className="tech-header">
                       <h4>{tech.userId?.userName}</h4>
-                      <div className="rating-badge">
-                        ⭐ {tech.avgRating ? `${tech.avgRating}/5` : 'New'} 
-                        <span className="review-count">({tech.totalReviews || 0})</span>
+                      <div className="tech-rating">
+                        {'⭐'.repeat(Math.floor(tech.avgRating || 0))} 
+                        ({tech.avgRating?.toFixed(1) || 'No ratings'})
                       </div>
                     </div>
-
                     <div className="tech-details">
-                      <div className="detail-row">
-                        <span className="detail-label">Expertise:</span>
-                        <span className="detail-value">{tech.expertise?.join(', ') || 'Not specified'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Service Areas:</span>
-                        <span className="detail-value">{tech.serviceAreas?.join(', ') || 'Not specified'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Pricing:</span>
-                        <span className="detail-value pricing">${tech.pricing}/hour</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-label">Contact:</span>
-                        <span className="detail-value">{tech.userId?.phone}</span>
-                      </div>
+                      <p><strong>📧 Email:</strong> {tech.userId?.email}</p>
+                      <p><strong>📞 Phone:</strong> {tech.userId?.phone}</p>
+                      <p><strong>🛠️ Expertise:</strong> {tech.expertise?.join(', ') || 'Not specified'}</p>
+                      <p><strong>📍 Service Areas:</strong> {tech.serviceAreas?.join(', ') || 'Not specified'}</p>
+                      <p><strong>💰 Pricing:</strong> ₹{tech.pricing || 'Contact for pricing'}/service</p>
+                      <p><strong>📅 Available Days:</strong> {getAvailableDaysCount(tech.availability)} days/week</p>
                     </div>
-
-                    <div className="availability-preview">
-                      <h5>Availability ({getAvailableDaysCount(tech.availability)} days available):</h5>
-                      <div className="availability-days">
-                        {tech.availability && Object.entries(tech.availability).slice(0, 3).map(([day, dayAvailability]) => (
-                          <div key={day} className="day-time">
-                            <span className="day">{day.charAt(0).toUpperCase() + day.slice(1)}:</span>
-                            <span className="time">{formatAvailability(dayAvailability)}</span>
+                    <div className="availability-section">
+                      <h5>Weekly Availability:</h5>
+                      <div className="availability-grid">
+                        {Object.entries(tech.availability || {}).map(([day, avail]) => (
+                          <div key={day} className="day-availability">
+                            <span className="day-name">{day.charAt(0).toUpperCase() + day.slice(1)}:</span>
+                            <span className={`availability-status ${avail && (typeof avail === 'object' ? avail.available : avail !== 'Not available') ? 'available' : 'unavailable'}`}>
+                              {formatAvailability(avail)}
+                            </span>
                           </div>
                         ))}
-                        {tech.availability && Object.keys(tech.availability).length > 3 && (
-                          <div className="more-days">+{Object.keys(tech.availability).length - 3} more days</div>
-                        )}
                       </div>
                     </div>
-
                     <button 
-                      className="book-btn"
+                      className="book-btn" 
                       onClick={() => bookTechnician(tech._id)}
                     >
-                      Book This Technician
+                      📅 Book Now
                     </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "chat" && (
+          <div className="chat-tab">
+            <div className="chat-messages">
+              {chatMessages.map((m,i)=>
+                <div key={i} className={`bubble ${m.type}`}>
+                  {m.text.split("\n").map((line,j)=><p key={j} dangerouslySetInnerHTML={{__html:line.replace(/\\*\\*(.*?)\\*\\*/g,"<strong>$1</strong>")}}/>)}
+                </div>)}
+
+              {isTyping && <div className="bubble assistant typing"><span/><span/><span/></div>}
+              <div ref={chatEndRef}/>
+            </div>
+
+            <div className="chat-input-bar">
+              <textarea
+                value={chatInput}
+                onChange={e=>setChatInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Describe the problem…"
+              />
+              <button onClick={()=>sendToRepairHero(chatInput)} disabled={!chatInput.trim()||isTyping}>
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
+
+        {activeTab === 'map' && (
+          <div className="map-tab">
+            <div className="map-header">
+              <h2>🗺️ Find Nearby Technicians</h2>
+              <p>Discover technicians in your area with an interactive map</p>
+
+              {!locationPermission && (
+                <div className="location-prompt">
+                  <p>📍 Enable location access to find nearby technicians</p>
+                  <button className="location-btn" onClick={getCurrentLocation}>
+                    Enable Location
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {locationPermission && (
+              <>
+                <div className="map-controls">
+                  <div className="search-radius-control">
+                    <label>Search Radius: {searchRadius} km</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="50"
+                      value={searchRadius}
+                      onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
+                    />
+                    <div className="radius-labels">
+                      <span>1km</span>
+                      <span>25km</span>
+                      <span>50km</span>
+                    </div>
+                  </div>
+                  <button className="refresh-location-btn" onClick={getCurrentLocation}>
+                    🔄 Update Location
+                  </button>
+                </div>
+
+                <div className="map-container">
+                  <MapContainer 
+                    center={mapCenter} 
+                    zoom={mapZoom} 
+                    style={{ height: '500px', width: '100%', borderRadius: '12px' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    {/* Customer location marker and search radius */}
+                    {userLocation && (
+                      <>
+                        <Marker 
+                          position={[userLocation.latitude, userLocation.longitude]} 
+                          icon={customerIcon}
+                        >
+                          <Popup>
+                            <div className="popup-content">
+                              <h4>📍 Your Location</h4>
+                              <p>You are here!</p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                        <Circle
+                          center={[userLocation.latitude, userLocation.longitude]}
+                          radius={searchRadius * 1000} // Convert km to meters
+                          color="#4299e1"
+                          fillColor="#4299e1"
+                          fillOpacity={0.1}
+                        />
+                      </>
+                    )}
+
+                    {/* Technician markers */}
+                    {mapTechnicians.map(tech => (
+                      tech.serviceLocation && tech.serviceLocation.latitude && tech.serviceLocation.longitude && (
+                        <Marker
+                          key={tech._id}
+                          position={[tech.serviceLocation.latitude, tech.serviceLocation.longitude]}
+                          icon={technicianIcon}
+                        >
+                          <Popup>
+                            <div className="popup-content">
+                              <h4>🔧 {tech.userId?.userName}</h4>
+                              <p><strong>Distance:</strong> {tech.distance} km away</p>
+                              <p><strong>Expertise:</strong> {tech.expertise?.join(', ')}</p>
+                              <p><strong>Rating:</strong> {'⭐'.repeat(Math.floor(tech.avgRating || 0))} ({tech.avgRating?.toFixed(1) || 'No ratings'})</p>
+                              <p><strong>Pricing:</strong> ₹{tech.pricing}/service</p>
+                              <button 
+                                className="popup-book-btn"
+                                onClick={() => handleMapTechnicianSelection(tech._id)}
+                              >
+                                📅 Book Now
+                              </button>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      )
+                    ))}
+                  </MapContainer>
+                </div>
+
+                <div className="map-legend">
+                  <h4>Map Legend:</h4>
+                  <div className="legend-item">
+                    <span className="legend-icon customer">📍</span>
+                    <span>Your Location</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-icon technician">🔧</span>
+                    <span>Available Technicians</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-icon radius">⭕</span>
+                    <span>Search Radius ({searchRadius}km)</span>
+                  </div>
+                </div>
+
+                <div className="nearby-technicians">
+                  <h3>👨‍🔧 Nearby Technicians ({mapTechnicians.length} found)</h3>
+                  {mapTechnicians.length === 0 ? (
+                    <p>No nearby technicians found within {searchRadius}km radius.</p>
+                  ) : (
+                    <div className="technicians-list">
+                      {mapTechnicians.map(tech => (
+                        <div key={tech._id} className="nearby-tech-card">
+                          <div className="tech-info">
+                            <h4>{tech.userId?.userName}</h4>
+                            <p className="distance">📍 {tech.distance} km away</p>
+                            <p><strong>🛠️ Expertise:</strong> {tech.expertise?.join(', ')}</p>
+                            <p><strong>⭐ Rating:</strong> {tech.avgRating?.toFixed(1) || 'No ratings'}</p>
+                            <p><strong>💰 Pricing:</strong> ₹{tech.pricing}/service</p>
+                          </div>
+                          <div className="tech-actions">
+                            <button 
+                              className="book-nearby-btn"
+                              onClick={() => handleMapTechnicianSelection(tech._id)}
+                            >
+                              📅 Book This Technician
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'assistant' && (
+          <div className="assistant-tab">
+            <h2>🛠️ Book Your Service</h2>
+            <p>Book your preferred technician for quality service</p>
+
+            <form onSubmit={handleBookingSubmit} className="booking-form">
+              <div className="form-group">
+                <label>Select Technician:</label>
+                <select 
+                  value={bookingForm.technicianId} 
+                  onChange={(e) => handleTechnicianSelection(e.target.value)}
+                  required
+                >
+                  <option value="">Choose a technician</option>
+                  {technicians.filter(tech => tech.kycStatus === 'approved').map(tech => (
+                    <option key={tech._id} value={tech._id}>
+                      {tech.userId?.userName} - {tech.expertise?.join(', ')} 
+                      {tech.distance ? ` (${tech.distance}km away)` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedTechnician && (
+                <div className="selected-technician-info">
+                  <h4>Selected Technician: {selectedTechnician.userId?.userName}</h4>
+                  <p>📞 {selectedTechnician.userId?.phone}</p>
+                  <p>🛠️ Expertise: {selectedTechnician.expertise?.join(', ')}</p>
+                  <p>⭐ Rating: {selectedTechnician.avgRating?.toFixed(1) || 'No ratings'}</p>
+                  <p>💰 Pricing: ₹{selectedTechnician.pricing}/service</p>
+                  {selectedTechnician.distance && (
+                    <p>📍 Distance: {selectedTechnician.distance} km</p>
+                  )}
+                </div>
+              )}
+
+              {selectedTechnician && (
+                <>
+                  <div className="form-group">
+                    <label>Service Type:</label>
+                    <select 
+                      value={bookingForm.serviceType} 
+                      onChange={(e) => setBookingForm({...bookingForm, serviceType: e.target.value})}
+                      required
+                    >
+                      <option value="">Select service type</option>
+                      {selectedTechnician.expertise?.map(expertise => (
+                        <option key={expertise} value={expertise}>{expertise} Service</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Preferred Date:</label>
+                      <input 
+                        type="date" 
+                        value={bookingForm.scheduledDate}
+                        onChange={(e) => setBookingForm({...bookingForm, scheduledDate: e.target.value})}
+                        min={new Date().toISOString().split('T')[0]}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Preferred Time:</label>
+                      <input 
+                        type="time" 
+                        value={bookingForm.scheduledTime}
+                        onChange={(e) => setBookingForm({...bookingForm, scheduledTime: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Service Address:</label>
+                    <input 
+                      type="text" 
+                      value={bookingForm.address}
+                      onChange={(e) => setBookingForm({...bookingForm, address: e.target.value})}
+                      placeholder="Enter your complete address"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Problem Description:</label>
+                    <textarea 
+                      value={bookingForm.description}
+                      onChange={(e) => setBookingForm({...bookingForm, description: e.target.value})}
+                      placeholder="Describe the issue you're experiencing..."
+                      rows="4"
+                    />
+                  </div>
+
+                  {!userLocation && (
+                    <div className="location-warning">
+                      <p>⚠️ Location access is required for booking. Please enable location services.</p>
+                      <button type="button" onClick={getCurrentLocation}>
+                        Enable Location
+                      </button>
+                    </div>
+                  )}
+
+                  <button type="submit" className="submit-booking-btn" disabled={!userLocation}>
+                    📅 Submit Booking Request
+                  </button>
+                </>
+              )}
+            </form>
+          </div>
+        )}
+
+        {activeTab === 'bookings' && (
+          <div className="bookings-tab">
+            <h2>📋 My Bookings</h2>
+            <p>Track and manage your service appointments</p>
+
+            {bookings.length === 0 ? (
+              <p className="no-bookings">When you book a service, it will appear here.</p>
+            ) : (
+              <div className="bookings-list">
+                {bookings.map(booking => (
+                  <div key={booking._id} className="booking-card">
+                    <div className="booking-header">
+                      <h4>Booking #{booking._id.slice(-6)}</h4>
+                      <span className={`status-badge status-${booking.status}`}>
+                        {booking.status.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="booking-details">
+                      <p><strong>👨‍🔧 Technician:</strong> {booking.technicianId?.userName}</p>
+                      <p><strong>📞 Contact:</strong> {booking.technicianId?.phone}</p>
+                      <p><strong>🛠️ Service:</strong> {booking.serviceType}</p>
+                      <p><strong>📅 Scheduled:</strong> {new Date(booking.scheduledDate).toLocaleDateString()} at {booking.scheduledTime}</p>
+                      <p><strong>📍 Address:</strong> {booking.address}</p>
+                      {booking.distance && (
+                        <p><strong>🚗 Distance:</strong> {booking.distance} km</p>
+                      )}
+                      {booking.description && (
+                        <p><strong>📝 Description:</strong> {booking.description}</p>
+                      )}
+                      <p><strong>🕒 Booked on:</strong> {new Date(booking.createdAt).toLocaleString()}</p>
+                    </div>
+
+                    <div className="booking-actions">
+                      {booking.status === 'completed' && !booking.reviewId && (
+                        <div className="review-section">
+                          <h5>Rate this service:</h5>
+                          <select id={`rating-${booking._id}`}>
+                            <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                            <option value="4">⭐⭐⭐⭐ Good</option>
+                            <option value="3">⭐⭐⭐ Average</option>
+                            <option value="2">⭐⭐ Poor</option>
+                            <option value="1">⭐ Very Poor</option>
+                          </select>
+                          <input 
+                            type="text" 
+                            id={`comment-${booking._id}`}
+                            placeholder="Add a comment (optional)"
+                          />
+                          <button 
+                            onClick={() => {
+                              const rating = document.getElementById(`rating-${booking._id}`).value;
+                              const comment = document.getElementById(`comment-${booking._id}`).value;
+                              submitReview(booking._id, rating, comment);
+                            }}
+                            className="review-btn"
+                          >
+                            Submit Review
+                          </button>
+                        </div>
+                      )}
+
+                      {booking.reviewId && (
+                        <p className="review-submitted">✅ Review submitted</p>
+                      )}
+
+                      {['completed', 'rejected', 'cancelled'].includes(booking.status) && (
+                        <button 
+                          onClick={() => raiseFlag(booking._id)} 
+                          className="flag-btn"
+                        >
+                          🚩 Report Issue
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
-      )}
-      {/* Assistant Tab - Book Service */}
-      {activeTab === 'assistant' && (
-        <div className="tab-content">
-          <div className="section-header">
-            <h2>Book a Service</h2>
-            <p>Schedule a service appointment with your preferred technician</p>
-          </div>
+        )}
 
-          <div className="booking-form-container">
-            <form className="booking-form" onSubmit={handleBookingSubmit}>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label htmlFor="technicianId">Select Technician:</label>
-                  <select 
-                    id="technicianId"
-                    value={bookingForm.technicianId}
-                    onChange={(e) => handleTechnicianSelection(e.target.value)}
-                    required
-                    className="form-select"
-                  >
-                    <option value="">Choose a technician</option>
-                    {technicians.map((tech) => (
-                      <option key={tech._id} value={tech._id}>
-                        {tech.userId?.userName} | {tech.expertise?.join(', ')} | ${tech.pricing}/hr 
-                      </option>
-                    ))}
-                  </select>
-                </div>
+        {activeTab === 'profile' && (
+          <div className="profile-tab">
+            <h2>👤 My Profile</h2>
+            <p>Manage your account details and preferences</p>
 
-                {/* Show selected technician details */}
-                {selectedTechnician && (
-                  <div className="selected-technician-info">
-                    <h4>Selected Technician Details:</h4>
-                    <div className="tech-info-grid">
-                      <div><strong>Name:</strong> {selectedTechnician.userId?.userName}</div>
-                      <div><strong>Phone:</strong> {selectedTechnician.userId?.phone}</div>
-                      <div><strong>Email:</strong> {selectedTechnician.userId?.email}</div>
-                      <div><strong>Expertise:</strong> {selectedTechnician.expertise?.join(', ')}</div>
-                      <div><strong>Service Areas:</strong> {selectedTechnician.serviceAreas?.join(', ')}</div>
-                      <div><strong>Pricing:</strong> ${selectedTechnician.pricing}/hour</div>
-                      <div><strong>Rating:</strong> ⭐{selectedTechnician.avgRating || 'New'} ({selectedTechnician.totalReviews || 0} reviews)</div>
-                    </div>
+            <form onSubmit={handleProfileUpdate} className="profile-form">
+              <div className="form-group">
+                <label>Full Name:</label>
+                <input 
+                  type="text" 
+                  value={profileForm.userName}
+                  onChange={(e) => setProfileForm({...profileForm, userName: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Email:</label>
+                <input 
+                  type="email" 
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Phone:</label>
+                <input 
+                  type="tel" 
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="profile-info">
+                <h4>Account Information</h4>
+                <p><strong>Account Status:</strong> {userProfile?.status}</p>
+                <p><strong>Member Since:</strong> {new Date(userProfile?.createdAt).toLocaleDateString()}</p>
+                <p><strong>Total Bookings:</strong> {bookings.length}</p>
+                {userLocation && (
+                  <div className="location-info">
+                    <p><strong>Location:</strong> {userLocation.latitude?.toFixed(6)}, {userLocation.longitude?.toFixed(6)}</p>
+                    <button type="button" onClick={getCurrentLocation}>
+                      Update Location
+                    </button>
                   </div>
                 )}
-
-                <div className="form-group">
-                  <label htmlFor="serviceType">Service Type:</label>
-                  <select 
-                    id="serviceType"
-                    value={bookingForm.serviceType}
-                    onChange={(e) => setBookingForm({...bookingForm, serviceType: e.target.value})}
-                    required
-                    className="form-select"
-                    disabled={!selectedTechnician}
-                  >
-                    <option value="">
-                      {selectedTechnician ? 'Select from available services' : 'Please select a technician first'}
-                    </option>
-                    {selectedTechnician && selectedTechnician.expertise?.map(service => (
-                      <option key={service} value={service}>
-                        {service} Repair
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="scheduledDate">Preferred Date:</label>
-                  <input
-                    type="date"
-                    id="scheduledDate"
-                    value={bookingForm.scheduledDate}
-                    onChange={(e) => setBookingForm({...bookingForm, scheduledDate: e.target.value})}
-                    required
-                    className="form-input"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="scheduledTime">Preferred Time:</label>
-                  <input
-                    type="time"
-                    id="scheduledTime"
-                    value={bookingForm.scheduledTime}
-                    onChange={(e) => setBookingForm({...bookingForm, scheduledTime: e.target.value})}
-                    required
-                    className="form-input"
-                  />
-                </div>
               </div>
 
-              <div className="form-group full-width">
-                <label htmlFor="address">Service Address:</label>
-                <textarea
-                  id="address"
-                  value={bookingForm.address}
-                  onChange={(e) => setBookingForm({...bookingForm, address: e.target.value})}
-                  placeholder="Enter your full address"
-                  required
-                  className="form-textarea"
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label htmlFor="description">Problem Description:</label>
-                <textarea
-                  id="description"
-                  value={bookingForm.description}
-                  onChange={(e) => setBookingForm({...bookingForm, description: e.target.value})}
-                  placeholder="Describe the issue in detail"
-                  required
-                  className="form-textarea"
-                  rows="4"
-                />
-              </div>
-
-              <button type="submit" className="submit-btn">Submit Booking Request</button>
+              <button type="submit" className="update-profile-btn">
+                💾 Update Profile
+              </button>
             </form>
           </div>
-        </div>
-      )}
-
-      {/* Bookings Tab */}
-      {activeTab === 'bookings' && (
-        <div className="tab-content">
-          <div className="section-header">
-            <h2>My Bookings</h2>
-            <p>Track and manage your service appointments</p>
-            <div className="auto-refresh-notice">
-              🔄 Booking status updates automatically every 30 seconds
-            </div>
-          </div>
-
-          {bookings.length === 0 ? (
-            <div className="no-bookings">
-              <div className="empty-state">
-                <div className="empty-icon">📋</div>
-                <h3>No bookings yet</h3>
-                <p>When you book a service, it will appear here.</p>
-                <button 
-                  className="cta-btn"
-                  onClick={() => setActiveTab('home')}
-                >
-                  Browse Technicians
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bookings-grid">
-              {bookings.map((booking) => (
-                <div key={booking._id} className="booking-card">
-                  <div className="booking-header">
-                    <h3>Booking #{booking._id.slice(-6)}</h3>
-                    <span className={`booking-status ${booking.status}`}>
-                      {booking.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="booking-info">
-                    <div className="info-row">
-                      <span className="info-label">Technician:</span>
-                      <span className="info-value">{booking.technicianId?.userName}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Service:</span>
-                      <span className="info-value">{booking.serviceType}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Date:</span>
-                      <span className="info-value">{new Date(booking.scheduledDate).toLocaleDateString()}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Time:</span>
-                      <span className="info-value">{booking.scheduledTime}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Address:</span>
-                      <span className="info-value">{booking.address}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Description:</span>
-                      <span className="info-value">{booking.description}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Created:</span>
-                      <span className="info-value">{new Date(booking.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Status-specific messages */}
-                  {booking.status === 'in_progress' && (
-                    <div className="status-message in-progress">
-                      🔧 Your service is currently in progress!
-                    </div>
-                  )}
-
-                  {booking.status === 'completed' && (
-                    <div className="status-message completed">
-                      ✅ Service completed! Please leave a review.
-                    </div>
-                  )}
-
-                  {booking.status === 'completed' && !booking.reviewId && (
-                    <div className="review-section">
-                      <h4>Leave a Review</h4>
-                      <button 
-                        className="review-btn"
-                        onClick={() => {
-                          const rating = prompt('Rate this service (1-5):');
-                          const comment = prompt('Leave a comment (optional):');
-                          if (rating && rating >= 1 && rating <= 5) {
-                            submitReview(booking._id, rating, comment);
-                          }
-                        }}
-                      >
-                        Leave Review ⭐
-                      </button>
-                    </div>
-                  )}
-
-                  {booking.reviewId && (
-                    <div className="review-submitted">
-                      ✅ Review submitted
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="tab-content">
-          <div className="section-header">
-            <h2>My Profile</h2>
-            <p>Manage your account information</p>
-          </div>
-
-          <div className="profile-container">
-            {userProfile && (
-              <div className="current-profile">
-                <h3>Current Information</h3>
-                <div className="profile-info">
-                  <div className="profile-item">
-                    <span className="profile-label">Name:</span>
-                    <span className="profile-value">{userProfile.userName}</span>
-                  </div>
-                  <div className="profile-item">
-                    <span className="profile-label">Email:</span>
-                    <span className="profile-value">{userProfile.email}</span>
-                  </div>
-                  <div className="profile-item">
-                    <span className="profile-label">Phone:</span>
-                    <span className="profile-value">{userProfile.phone}</span>
-                  </div>
-                  <div className="profile-item">
-                    <span className="profile-label">Role:</span>
-                    <span className="profile-value role">{userProfile.role}</span>
-                  </div>
-                  <div className="profile-item">
-                    <span className="profile-label">Status:</span>
-                    <span className={`profile-value status ${userProfile.status}`}>{userProfile.status}</span>
-                  </div>
-                  <div className="profile-item">
-                    <span className="profile-label">Member since:</span>
-                    <span className="profile-value">{new Date(userProfile.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="profile-form-container">
-              <h3>Update Profile</h3>
-              <form className="profile-form" onSubmit={handleProfileUpdate}>
-                <div className="form-group">
-                  <label htmlFor="userName">Name:</label>
-                  <input
-                    type="text"
-                    id="userName"
-                    value={profileForm.userName}
-                    onChange={(e) => setProfileForm({...profileForm, userName: e.target.value})}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="email">Email:</label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="phone">Phone:</label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    value={profileForm.phone}
-                    onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <button type="submit" className="submit-btn">Update Profile</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

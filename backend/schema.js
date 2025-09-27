@@ -16,6 +16,12 @@ const UserSchema = new Schema({
 
     status: { type: String, enum: ["active", "suspended", "pending_verification"], default: "active" },
 
+    location: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        address: { type: String }
+    }
+
 }, { timestamps: true });
 
 // TECHNICIANS
@@ -72,15 +78,20 @@ const TechnicianSchema = new Schema({
 
     kycDocuments: {
 
-        IDImage: { data: Buffer, contentType: String },
-
-        Photo: { data: Buffer, contentType: String }
+        IDImage: String,
+        Photo: String
 
     },
 
     avgRating: { type: Number, default: 0 },
 
     totalReviews: { type: Number, default: 0 },
+
+    serviceLocation: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        serviceRadius: { type: Number, default: 10 } // radius in km
+    },
 
     partsOrdered: [{
 
@@ -105,25 +116,27 @@ const TechnicianSchema = new Schema({
 // BOOKINGS
 
 const BookingSchema = new Schema({
-
     customerId: { type: Types.ObjectId, ref: "User", required: true },
-
     technicianId: { type: Types.ObjectId, ref: "User", required: true },
-
     serviceType: { type: String, enum: ["AC", "Refrigerator", "Washing Machine"], required: true },
-
     description: String,
-
     address: String,
-
     scheduledDate: Date,
-
     scheduledTime: String,
-
-    status: { type: String, enum: ["pending", "accepted", "rejected", "completed", "cancelled", "in_progress"], default: "pending" },
-
-    reviewId: { type: Types.ObjectId, ref: "Review" }
-
+    status: {
+        type: String,
+        enum: ["pending", "accepted", "rejected", "completed", "cancelled", "in_progress"],
+        default: "pending"
+    },
+    reviewId: { type: Types.ObjectId, ref: "Review" },
+    cancellationReason: String,
+    cancelledBy: { type: Types.ObjectId, ref: "User" },
+    cancelledAt: Date,
+    serviceLocation: {
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true }
+  },
+  distance: { type: Number }
 }, { timestamps: true });
 
 // REVIEWS
@@ -145,21 +158,14 @@ const ReviewSchema = new Schema({
 // FLAGS
 
 const FlagSchema = new Schema({
-
     raisedBy: { type: Types.ObjectId, ref: "User", required: true },
-
     againstUser: { type: Types.ObjectId, ref: "User", required: true },
-
     reason: String,
-
     status: { type: String, enum: ["open", "resolved", "dismissed"], default: "open" },
-
     resolvedBy: { type: Types.ObjectId, ref: "User" },
-
     resolvedAt: Date,
-
-    description: String
-
+    description: String,
+    relatedBooking: { type: Types.ObjectId, ref: "Booking" }
 }, { timestamps: true });
 
 // ADMIN ACTIONS
