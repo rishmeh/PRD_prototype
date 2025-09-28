@@ -610,7 +610,7 @@ const TechnicianPage = () => {
 
               {!techProfile && (
                 <div className="setup-prompt">
-                  <p>Please complete your profile setup to start receiving booking requests.</p>
+                  <p>Please complete your <a onClick={() => setActiveTab('profile')} style={{color:"blue", cursor:"pointer"}}> profile</a> setup to start receiving booking requests.</p>
                 </div>
               )}
 

@@ -350,7 +350,6 @@ const AdminPage = () => {
         <p>Complete platform management and oversight</p>
       </div>
 
-      {/* Navigation - including new parts orders tab */}
       <div className="admin-tabs">
         {['dashboard', 'technicians', 'customers', 'bookings', 'parts', 'part-orders', 'flags', 'reviews'].map((tab) => (
           <div
@@ -373,6 +372,15 @@ const AdminPage = () => {
             </span>
           </div>
         ))}
+        <button 
+            className="logout-btn" 
+            onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}
+          >
+            Logout
+          </button>
       </div>
 
       <div className="tab-content">

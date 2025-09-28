@@ -42,11 +42,6 @@ function HomePage() {
           <p>Create your profile, manage bookings, and grow your customer base.</p>
           <a href="/technician">Join Us →</a>
         </div>
-        <div className="card">
-          <h3>For Admins</h3>
-          <p>Verify technicians, monitor bookings, and resolve disputes.</p>
-          <a href="/admin">Go to Panel →</a>
-        </div>
       </section>
 
       {/* Footer */}
