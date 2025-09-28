@@ -557,7 +557,8 @@ const TechnicianPage = () => {
     <div className="technician-page">
       <nav className="technician-nav">
         <div className="nav-brand">
-          <h2>Technician Panel</h2>
+          <img src='\pfp.jpg' height="50" style={{display:"inline"}}/>
+          <h2  style={{display:"inline"}}>{techProfile?.userId?.userName || 'Technician'}</h2>
         </div>
         <div className="nav-tabs">
           <button 

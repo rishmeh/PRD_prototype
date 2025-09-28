@@ -31,6 +31,11 @@
   font-weight: 700;
 }
 
+.nav-brand{
+  display: flex;
+  align-items: center;
+}
+
 .nav-tabs {
   display: flex;
   gap: 1rem;

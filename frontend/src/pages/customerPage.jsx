@@ -599,7 +599,8 @@ const handleKey = e => {
     <div className="customer-page">
       <nav className="customer-nav">
         <div className="nav-brand">
-          <h2>Customer Panel</h2>
+          <img src='\pfp.jpg' height="50" style={{display:"inline"}}/>
+          <h2  style={{display:"inline"}}>{userProfile?.userName || 'Customer'}</h2>
         </div>
         <div className="nav-tabs">
           <button 
