@@ -2,11 +2,14 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const connectDB = require('./databaseConnection');
-const dotenv =require("dotenv");
+const dotenv = require("dotenv");
 dotenv.config()
 
 app.use(cors({
-    origin: process.env.frontend_url, 
+    origin: [
+        "http://localhost:5173",            // dev
+        process.env.FRONTEND_URL  // prod
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 
