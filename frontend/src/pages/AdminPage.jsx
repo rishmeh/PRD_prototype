@@ -48,7 +48,7 @@ const AdminPage = () => {
       }
 
       try {
-        const res = await fetch('http://localhost:8080/api/me', {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -82,25 +82,25 @@ const AdminPage = () => {
 
       try {
         const [techRes, userRes, bookingRes, partRes, partOrderRes, flagRes, reviewRes] = await Promise.all([
-          fetch('http://localhost:8080/api/admin/technicians', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/technicians`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/admin/users', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/users`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/admin/bookings', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/bookings`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/parts', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/parts`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/admin/part-orders', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/part-orders`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/admin/flags', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/flags`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch('http://localhost:8080/api/admin/reviews', {
+          fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/reviews`, {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
@@ -165,7 +165,7 @@ const AdminPage = () => {
   // NEW: View KYC Images Function
   const viewKycImages = async (technicianId) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/technicians/${technicianId}/kyc-images`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/technicians/${technicianId}/kyc-images`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -185,7 +185,7 @@ const AdminPage = () => {
     if (!reason) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/bookings/${bookingId}/cancel`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/bookings/${bookingId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ const AdminPage = () => {
     if (!reason) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/part-orders/${orderId}/cancel`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/part-orders/${orderId}/cancel`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +234,7 @@ const AdminPage = () => {
   // KYC approval/rejection
   const handleKycAction = async (technicianId, action) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/technicians/${technicianId}/kyc`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/technicians/${technicianId}/kyc`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ const AdminPage = () => {
   const handleAddPart = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8080/api/admin/parts', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/parts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -294,7 +294,7 @@ const AdminPage = () => {
   // Update user status
   const handleUserAction = async (userId, action, userType) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/users/${userId}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/users/${userId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -318,7 +318,7 @@ const AdminPage = () => {
   // Handle flag resolution
   const handleFlagAction = async (flagId, action) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/admin/flags/${flagId}`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/admin/flags/${flagId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -864,13 +864,13 @@ const AdminPage = () => {
                 {kycImages.IDImage && (
                   <div className="kyc-image-wrapper">
                     <h4>ID Document</h4>
-                    <img src={`http://localhost:8080${kycImages.IDImage}`} alt="ID Document" className="kyc-image" />
+                    <img src={`${import.meta.env.VITE_BACKEND_URL}${kycImages.IDImage}`} alt="ID Document" className="kyc-image" />
                   </div>
                 )}
                 {kycImages.Photo && (
                   <div className="kyc-image-wrapper">
                     <h4>Photo</h4>
-                    <img src={`http://localhost:8080${kycImages.Photo}`} alt="Technician Photo" className="kyc-image" />
+                    <img src={`${import.meta.env.VITE_BACKEND_URL}${kycImages.Photo}`} alt="Technician Photo" className="kyc-image" />
                   </div>
                 )}
               </div>

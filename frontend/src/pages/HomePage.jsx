@@ -5,7 +5,7 @@ function HomePage() {
     <div className="app">
       {/* Header */}
       <header className="header">
-        <h1 className="logo">PRD</h1>
+        <h1 className="logo">Repair Hero</h1>
         <nav className="nav">
           <a href="/login">Login</a>
           <a href="/signup" className="btn">Sign Up</a>
@@ -51,7 +51,7 @@ function HomePage() {
 
       {/* Footer */}
       <footer className="footer">
-        © 2025 PRD · All Rights Reserved
+        © 2025 Repair Hero · All Rights Reserved
       </footer>
     </div>
   )

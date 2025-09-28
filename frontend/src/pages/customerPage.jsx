@@ -70,7 +70,7 @@ const CustomerPage = () => {
   const [chatMessages, setChatMessages] = useState([
   {
     type: "assistant",
-    text: `Hello! I’m **Repair Hero** 🔧.\n\nDescribe any AC, Washing-Machine or Refrigerator problem and I’ll reply with:\n• 🔧 Issue diagnosis\n• 👨‍🔧 Technician type\n• 💰 INR cost estimate\n• 💡 Quick tips`,
+    text: `Hello! I’m Repair Hero 🔧.\n\nDescribe any AC, Washing-Machine or Refrigerator problem and I’ll reply with:\n• 🔧 Issue diagnosis\n• 👨‍🔧 Technician type\n• 💰 INR cost estimate\n• 💡 Quick tips`,
     ts: Date.now()
   }
 ]);
@@ -90,7 +90,7 @@ const chatEndRef = useRef(null);
       }
 
       try {
-        const res = await fetch('http://localhost:8080/api/me', {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -123,7 +123,7 @@ const chatEndRef = useRef(null);
 
     const pollBookings = async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/bookings/customer', {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/customer`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -223,7 +223,7 @@ const chatEndRef = useRef(null);
   // Update user location in backend
   const updateUserLocation = async (location) => {
     try {
-      const res = await fetch('http://localhost:8080/api/location', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/location`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -248,7 +248,7 @@ const chatEndRef = useRef(null);
   const fetchNearbyTechnicians = async (location) => {
     try {
       const res = await fetch(
-        `http://localhost:8080/api/technicians/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${searchRadius}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/technicians/nearby?latitude=${location.latitude}&longitude=${location.longitude}&radius=${searchRadius}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -284,6 +284,7 @@ const sendToRepairHero = async (msg) => {
       `You are Repair Hero, an appliance-repair expert.`,
       `Only discuss AC, Washing-Machine or Refrigerator issues.`,
       `Always answer with:\n🔧 Issue Diagnosis\n👨‍🔧 Technician Type\n💰 Estimated Cost (INR)\n💡 Quick Tips`,
+      `Your response should be in text format, not in md.`,
       history,
       `User: ${msg.trim()}`,
       `Repair Hero:`
@@ -347,7 +348,7 @@ const handleKey = e => {
 
       try {
         // Fetch user profile
-        const userRes = await fetch('http://localhost:8080/api/me', {
+        const userRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (userRes.ok) {
@@ -370,7 +371,7 @@ const handleKey = e => {
         }
 
         // Fetch approved technicians
-        const techRes = await fetch('http://localhost:8080/api/technicians', {
+        const techRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (techRes.ok) {
@@ -381,7 +382,7 @@ const handleKey = e => {
         }
 
         // Fetch user bookings
-        const bookingRes = await fetch('http://localhost:8080/api/bookings/customer', {
+        const bookingRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/customer`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (bookingRes.ok) {
@@ -450,7 +451,7 @@ const handleKey = e => {
         }
       };
 
-      const res = await fetch('http://localhost:8080/api/bookings', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -472,7 +473,7 @@ const handleKey = e => {
         setSelectedTechnician(null);
 
         // Refresh bookings
-        const bookingRes = await fetch('http://localhost:8080/api/bookings/customer', {
+        const bookingRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/customer`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (bookingRes.ok) {
@@ -492,7 +493,7 @@ const handleKey = e => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8080/api/me', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -523,7 +524,7 @@ const handleKey = e => {
   // Submit review for completed booking
   const submitReview = async (bookingId, rating, comment) => {
     try {
-      const res = await fetch('http://localhost:8080/api/reviews', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/reviews`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -539,7 +540,7 @@ const handleKey = e => {
       if (res.ok) {
         alert('Review submitted successfully!');
         // Refresh bookings to show review submitted
-        const bookingRes = await fetch('http://localhost:8080/api/bookings/customer', {
+        const bookingRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/customer`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (bookingRes.ok) {
@@ -563,7 +564,7 @@ const handleKey = e => {
     if (!reason) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/flag`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/${bookingId}/flag`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

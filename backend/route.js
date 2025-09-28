@@ -35,14 +35,14 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-           Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-           Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
@@ -117,6 +117,29 @@ router.post("/register_technician", async (req, res) => {
       token: generateToken(newUser),
       user: newUser
     });
+
+    const newTechnician = new Technician({
+      userId: newUser._id,
+      expertise: [],
+      serviceAreas: [],
+      availability: {
+        monday: { available: false, startHour: 9, endHour: 17 },
+        tuesday: { available: false, startHour: 9, endHour: 17 },
+        wednesday: { available: false, startHour: 9, endHour: 17 },
+        thursday: { available: false, startHour: 9, endHour: 17 },
+        friday: { available: false, startHour: 9, endHour: 17 },
+        saturday: { available: false, startHour: 9, endHour: 17 },
+        sunday: { available: false, startHour: 9, endHour: 17 }
+      },
+      pricing: 0,
+      kycStatus: "not_submitted",
+      avgRating: 0,
+      totalReviews: 0
+    });
+
+    await newTechnician.save();
+
+
   } catch (err) {
     res.status(500).json({ message: "Registration failed", error: err.message });
   }
@@ -180,11 +203,11 @@ router.put("/me", verifyToken, async (req, res) => {
 // Update user location (for both customers and technicians)
 router.put("/location", verifyToken, async (req, res) => {
   const { latitude, longitude, address } = req.body;
-  
+
   if (!latitude || !longitude) {
     return res.status(400).json({ message: "Latitude and longitude are required" });
   }
-  
+
   try {
     const updatedUser = await User.findByIdAndUpdate(
       req.userId,
@@ -197,7 +220,7 @@ router.put("/location", verifyToken, async (req, res) => {
       },
       { new: true }
     ).select("-password");
-    
+
     // If user is a technician, also update technician service location
     if (req.role === "technician") {
       await Technician.findOneAndUpdate(
@@ -211,7 +234,7 @@ router.put("/location", verifyToken, async (req, res) => {
         }
       );
     }
-    
+
     res.json({ message: "Location updated successfully", user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: "Failed to update location", error: err.message });
@@ -224,14 +247,14 @@ router.put("/location", verifyToken, async (req, res) => {
 
 router.get("/technicians/nearby", verifyToken, async (req, res) => {
   if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
-  
+
   const { latitude, longitude, radius = 25, expertise } = req.query;
   try {
     let query = { kycStatus: "approved" };
     if (expertise) query.expertise = expertise;
-    
+
     const technicians = await Technician.find(query).populate("userId", "userName email phone location");
-    
+
     const nearbyTechnicians = technicians
       .filter(tech => tech.serviceLocation?.latitude && tech.serviceLocation?.longitude)
       .map(tech => ({
@@ -243,7 +266,7 @@ router.get("/technicians/nearby", verifyToken, async (req, res) => {
       }))
       .filter(tech => tech.distance <= Math.min(parseFloat(radius), tech.serviceLocation.serviceRadius))
       .sort((a, b) => a.distance - b.distance);
-    
+
     res.json(nearbyTechnicians);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch nearby technicians", error: err.message });
@@ -253,24 +276,24 @@ router.get("/technicians/nearby", verifyToken, async (req, res) => {
 // Update technician service radius
 router.put("/technicians/service-radius", verifyToken, async (req, res) => {
   if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
-  
+
   const { serviceRadius } = req.body;
-  
+
   if (!serviceRadius || serviceRadius < 1 || serviceRadius > 50) {
     return res.status(400).json({ message: "Service radius must be between 1 and 50 km" });
   }
-  
+
   try {
     const technician = await Technician.findOneAndUpdate(
       { userId: req.userId },
       { "serviceLocation.serviceRadius": parseFloat(serviceRadius) },
       { new: true }
     );
-    
+
     if (!technician) {
       return res.status(404).json({ message: "Technician profile not found" });
     }
-    
+
     res.json({ message: "Service radius updated successfully", serviceRadius });
   } catch (err) {
     res.status(500).json({ message: "Failed to update service radius", error: err.message });
@@ -312,17 +335,23 @@ router.get("/technicians", async (req, res) => {
 });
 
 // Get reviews for a technician
+// This route expects Technician document _id (68d8c760ade296d8fe1315be)
 router.get("/technicians/:id/reviews", async (req, res) => {
   try {
+    console.log("Looking for reviews with technicianId:", req.params.id);
+    
     const reviews = await Review.find({ technicianId: req.params.id })
       .populate("customerId", "userName")
       .sort({ createdAt: -1 });
 
+    console.log("Found reviews:", reviews.length);
+    
     res.json(reviews);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch reviews", error: err.message });
   }
 });
+
 
 // Get technician profile for current user
 router.get("/technicians/me", verifyToken, async (req, res) => {
@@ -358,46 +387,84 @@ router.post("/technicians/kyc", verifyToken, upload.fields([
       kycDocuments.Photo = req.files.Photo[0].path;
     }
 
+    // FIXED: Use upsert to create Technician profile if it doesn't exist
     const updatedTechnician = await Technician.findOneAndUpdate(
       { userId: req.userId },
       { 
+        userId: req.userId,  // Ensure userId is set
         kycDocuments,
-        kycStatus: "pending"
+        kycStatus: "pending",
+        // Initialize other required fields with defaults
+        expertise: [],
+        serviceAreas: [],
+        availability: {
+          monday: { available: false, startHour: 9, endHour: 17 },
+          tuesday: { available: false, startHour: 9, endHour: 17 },
+          wednesday: { available: false, startHour: 9, endHour: 17 },
+          thursday: { available: false, startHour: 9, endHour: 17 },
+          friday: { available: false, startHour: 9, endHour: 17 },
+          saturday: { available: false, startHour: 9, endHour: 17 },
+          sunday: { available: false, startHour: 9, endHour: 17 }
+        },
+        pricing: 0,
+        avgRating: 0,
+        totalReviews: 0
       },
-      { new: true }
+      { 
+        new: true,
+        upsert: true,  // ← This creates the document if it doesn't exist
+        setDefaultsOnInsert: true  // Apply schema defaults when inserting
+      }
     );
 
-    if (!updatedTechnician) {
-      return res.status(404).json({ message: "Technician profile not found" });
-    }
-
-    res.json({ message: "KYC documents uploaded successfully", kycStatus: "pending" });
+    res.json({ 
+      message: "KYC documents uploaded successfully", 
+      kycStatus: "pending",
+      technicianId: updatedTechnician._id 
+    });
   } catch (err) {
+    console.error("KYC Upload Error:", err);
     res.status(500).json({ message: "Failed to upload KYC documents", error: err.message });
   }
 });
 
+
 // Create flag (for customers and technicians)
 router.post("/bookings/:id/flag", verifyToken, async (req, res) => {
   const { reason, description } = req.body;
-  
+
   try {
-    // Verify booking exists and user has access
+    // Verify booking exists
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Check if user is involved in the booking
-    if (booking.customerId.toString() !== req.userId && 
-        booking.technicianId.toString() !== req.userId) {
+    let hasAccess = false;
+    let againstUser = null;
+
+    // Check if user is the customer
+    if (booking.customerId.toString() === req.userId) {
+      hasAccess = true;
+      againstUser = booking.technicianId;
+    } 
+    // Check if user is the technician
+    else if (req.role === "technician") {
+      // Find technician document to compare
+      const technician = await Technician.findOne({ userId: req.userId });
+      if (technician && booking.technicianId.toString() === technician._id.toString()) {
+        hasAccess = true;
+        againstUser = booking.customerId;
+      }
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({ message: "Access denied" });
     }
 
     const flag = new Flag({
       raisedBy: req.userId,
-      againstUser: req.userId === booking.customerId.toString() ? 
-                    booking.technicianId : booking.customerId,
+      againstUser: againstUser,
       reason,
       description,
       relatedBooking: req.params.id
@@ -410,6 +477,8 @@ router.post("/bookings/:id/flag", verifyToken, async (req, res) => {
   }
 });
 
+
+
 // Get user's flags
 router.get("/flags/my", verifyToken, async (req, res) => {
   try {
@@ -417,7 +486,7 @@ router.get("/flags/my", verifyToken, async (req, res) => {
       .populate("againstUser", "userName email")
       .populate("relatedBooking")
       .sort({ createdAt: -1 });
-    
+
     res.json(flags);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch flags", error: err.message });
@@ -426,46 +495,60 @@ router.get("/flags/my", verifyToken, async (req, res) => {
 
 
 // Update booking status (for technicians)
+// Fixed booking status update route
 router.put("/bookings/:id/status", verifyToken, async (req, res) => {
-  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
-
   const { status } = req.body;
-  const validStatuses = ["accepted", "rejected", "in_progress", "completed"];
-
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ message: "Invalid status" });
-  }
 
   try {
-    // First check if technician KYC is approved
-    const technician = await Technician.findOne({ userId: req.userId });
-    if (!technician || technician.kycStatus !== "approved") {
-      return res.status(403).json({ message: "KYC approval required to manage bookings" });
+    // Find the booking first
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
     }
 
-    const booking = await Booking.findOneAndUpdate(
-      { _id: req.params.id, technicianId: req.userId },
-      { 
-        status,
-        updatedAt: new Date()
-      },
+    let hasPermission = false;
+
+    // Check if user is the customer
+    if (req.role === "customer" && booking.customerId.toString() === req.userId) {
+      hasPermission = true;
+    }
+    // Check if user is the technician
+    else if (req.role === "technician") {
+      // Find technician document to get the _id
+      const technician = await Technician.findOne({ userId: req.userId });
+      if (technician && booking.technicianId.toString() === technician._id.toString()) {
+        hasPermission = true;
+      }
+    }
+
+    if (!hasPermission) {
+      return res.status(403).json({ message: "Access denied - not your booking" });
+    }
+
+    // Validate status transitions
+    const validStatuses = ["pending", "accepted", "rejected", "completed", "cancelled", "in_progress"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    // Update the booking status
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status },
       { new: true }
     ).populate("customerId", "userName email phone")
-     .populate("technicianId", "userName email phone");
+     .populate("technicianId", "userId"); // This will give us the user info
 
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found or not assigned to you" });
-    }
+    res.json({ 
+      message: "Booking status updated successfully", 
+      booking: updatedBooking 
+    });
 
-    // Here you could add email/SMS notification logic
-    // For now, we'll just log the status change
-    console.log(`Booking ${booking._id} status changed to ${status} by technician ${req.userId}`);
-
-    res.json(booking);
   } catch (err) {
     res.status(500).json({ message: "Failed to update booking status", error: err.message });
   }
 });
+
 
 
 // Get technician bookings (with KYC check)
@@ -479,7 +562,27 @@ router.get("/technicians/bookings", verifyToken, async (req, res) => {
       return res.status(403).json({ message: "KYC approval required to access bookings" });
     }
 
-    const bookings = await Booking.find({ technicianId: req.userId })
+    const bookings = await Booking.find({ technicianId: technician._id })
+      .populate("customerId", "userName email phone")
+      .sort({ createdAt: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch bookings", error: err.message });
+  }
+});
+
+router.get("/technicians/booking-requests", verifyToken, async (req, res) => {
+  if (req.role !== "technician") return res.status(403).json({ message: "Forbidden" });
+
+  try {
+    // Check if technician KYC is approved
+    const technician = await Technician.findOne({ userId: req.userId });
+    if (!technician || technician.kycStatus !== "approved") {
+      return res.status(403).json({ message: "KYC approval required to access bookings" });
+    }
+
+    const bookings = await Booking.find({ technicianId: req._id })
       .populate("customerId", "userName email phone")
       .sort({ createdAt: -1 });
 
@@ -510,19 +613,19 @@ router.get("/bookings/customer", verifyToken, async (req, res) => {
 // Create a new booking
 router.post("/bookings", verifyToken, async (req, res) => {
   if (req.role !== "customer") return res.status(403).json({ message: "Forbidden" });
-  
+
   const { technicianId, serviceType, scheduledDate, scheduledTime, address, description, serviceLocation } = req.body;
-  
+
   if (!serviceLocation?.latitude || !serviceLocation?.longitude) {
     return res.status(400).json({ message: "Service location coordinates required" });
   }
-  
+
   try {
-    const technician = await Technician.findOne({ userId: technicianId });
+    const technician = await Technician.findOne({ _id: technicianId });
     if (!technician || technician.kycStatus !== "approved") {
       return res.status(400).json({ message: "Selected technician not available" });
     }
-    
+
     let distance = null;
     if (technician.serviceLocation) {
       distance = Math.round(calculateDistance(
@@ -530,17 +633,17 @@ router.post("/bookings", verifyToken, async (req, res) => {
         technician.serviceLocation.latitude, technician.serviceLocation.longitude
       ) * 100) / 100;
     }
-    
+
     const booking = new Booking({
-      customerId: req.userId, technicianId, serviceType, scheduledDate, scheduledTime, 
+      customerId: req.userId, technicianId, serviceType, scheduledDate, scheduledTime,
       address, description, serviceLocation, distance, status: "pending"
     });
-    
+
     await booking.save();
     const populatedBooking = await Booking.findById(booking._id)
       .populate("customerId", "userName email phone")
       .populate("technicianId", "userName email phone");
-    
+
     res.status(201).json(populatedBooking);
   } catch (err) {
     res.status(500).json({ message: "Failed to create booking", error: err.message });
@@ -555,8 +658,8 @@ router.post("/reviews", verifyToken, async (req, res) => {
 
   try {
     // Check if booking exists and belongs to customer
-    const booking = await Booking.findOne({ 
-      _id: bookingId, 
+    const booking = await Booking.findOne({
+      _id: bookingId,
       customerId: req.userId,
       status: "completed"
     });
@@ -573,7 +676,7 @@ router.post("/reviews", verifyToken, async (req, res) => {
 
     const review = new Review({
       customerId: req.userId,
-      technicianId: booking.technicianId,
+      technicianId: booking.technicianId, // This is already the Technician document _id
       bookingId,
       rating,
       comment
@@ -584,20 +687,21 @@ router.post("/reviews", verifyToken, async (req, res) => {
     // Update booking with review ID
     await Booking.findByIdAndUpdate(bookingId, { reviewId: review._id });
 
-    // Recalculate technician's average rating
-    const technician = await Technician.findOne({ userId: booking.technicianId });
-    if (technician) {
-      const reviews = await Review.find({ technicianId: booking.technicianId });
-      const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    // FIXED: Recalculate technician's average rating
+    // Use booking.technicianId (Technician document _id) to find reviews
+    const reviews = await Review.find({ technicianId: booking.technicianId });
+    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
 
-      await Technician.findOneAndUpdate(
-        { userId: booking.technicianId },
-        { 
-          avgRating: Math.round(avgRating * 10) / 10,
-          totalReviews: reviews.length
-        }
-      );
-    }
+    // Update the Technician document using its _id
+    await Technician.findByIdAndUpdate(
+      booking.technicianId, // This is the Technician document _id
+      {
+        avgRating: Math.round(avgRating * 10) / 10,
+        totalReviews: reviews.length
+      }
+    );
+
+    console.log(`Updated technician ${booking.technicianId} - Rating: ${avgRating}, Reviews: ${reviews.length}`);
 
     res.status(201).json(review);
   } catch (err) {
@@ -660,7 +764,7 @@ router.put("/admin/technicians/:id/kyc", verifyToken, async (req, res) => {
 // Get KYC images for admin review
 router.get("/admin/technicians/:id/kyc-images", verifyToken, async (req, res) => {
   if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-  
+
   try {
     const technician = await Technician.findById(req.params.id);
     if (!technician) {
@@ -702,7 +806,7 @@ router.get("/admin/technicians", verifyToken, async (req, res) => {
 // Admin cancel booking with reason
 router.put("/admin/bookings/:id/cancel", verifyToken, async (req, res) => {
   if (req.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-  
+
   const { reason } = req.body;
   if (!reason) {
     return res.status(400).json({ message: "Cancellation reason is required" });
@@ -711,7 +815,7 @@ router.put("/admin/bookings/:id/cancel", verifyToken, async (req, res) => {
   try {
     const booking = await Booking.findByIdAndUpdate(
       req.params.id,
-      { 
+      {
         status: "cancelled",
         cancellationReason: reason,
         cancelledBy: req.userId,
@@ -719,7 +823,7 @@ router.put("/admin/bookings/:id/cancel", verifyToken, async (req, res) => {
       },
       { new: true }
     ).populate("customerId", "userName email phone")
-     .populate("technicianId", "userName email phone");
+      .populate("technicianId", "userName email phone");
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -729,7 +833,7 @@ router.put("/admin/bookings/:id/cancel", verifyToken, async (req, res) => {
     await AdminAction.create({
       adminId: req.userId,
       action: "CANCEL_BOOKING",
-      targetType: "booking", 
+      targetType: "booking",
       targetId: booking._id,
       description: `Cancelled booking with reason: ${reason}`
     });
@@ -886,14 +990,14 @@ router.put("/admin/flags/:id", verifyToken, async (req, res) => {
   try {
     const flag = await Flag.findByIdAndUpdate(
       req.params.id,
-      { 
-        status, 
+      {
+        status,
         resolvedBy: req.userId,
         resolvedAt: status !== "open" ? new Date() : null
       },
       { new: true }
     ).populate("raisedBy", "userName email")
-     .populate("againstUser", "userName email");
+      .populate("againstUser", "userName email");
 
     if (!flag) {
       return res.status(404).json({ message: "Flag not found" });
@@ -1068,7 +1172,7 @@ router.put("/admin/orders/:id/status", verifyToken, async (req, res) => {
       { status },
       { new: true }
     ).populate("p_id", "name")
-     .populate("buyer_ID", "userName");
+      .populate("buyer_ID", "userName");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -1077,7 +1181,7 @@ router.put("/admin/orders/:id/status", verifyToken, async (req, res) => {
     // Update technician's partsOrdered array
     await Technician.findOneAndUpdate(
       { userId: order.buyer_ID._id, "partsOrdered.o_id": order._id },
-      { 
+      {
         $set: { "partsOrdered.$.status": status }
       }
     );
@@ -1149,8 +1253,8 @@ router.post("/parts/order", verifyToken, async (req, res) => {
     await trackingLog.save();
 
     // Decrease part stock
-    await Part.findByIdAndUpdate(p_id, { 
-      $inc: { stock: -1 } 
+    await Part.findByIdAndUpdate(p_id, {
+      $inc: { stock: -1 }
     });
 
     // Add to technician's partsOrdered array
@@ -1170,9 +1274,9 @@ router.post("/parts/order", verifyToken, async (req, res) => {
       }
     );
 
-    res.status(201).json({ 
-      message: "Part ordered successfully", 
-      order: trackingLog 
+    res.status(201).json({
+      message: "Part ordered successfully",
+      order: trackingLog
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to order part", error: err.message });

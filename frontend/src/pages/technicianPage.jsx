@@ -81,7 +81,7 @@ const TechnicianPage = () => {
       }
 
       try {
-        const res = await fetch('http://localhost:8080/api/me', {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -155,7 +155,7 @@ const TechnicianPage = () => {
   // Update technician location in backend
   const updateTechnicianLocation = async (location) => {
     try {
-      const res = await fetch('http://localhost:8080/api/location', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/location`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ const TechnicianPage = () => {
   // Update service radius
   const updateServiceRadius = async (radius) => {
     try {
-      const res = await fetch('http://localhost:8080/api/technicians/service-radius', {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians/service-radius`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -202,7 +202,7 @@ const TechnicianPage = () => {
   // Fetch booking requests with distance
   const fetchBookingRequests = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/technicians/booking-requests", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians/booking-requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -225,7 +225,7 @@ const TechnicianPage = () => {
 
       try {
         // Fetch user info
-        const userRes = await fetch("http://localhost:8080/api/me", {
+        const userRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const user = await userRes.json();
@@ -239,7 +239,7 @@ const TechnicianPage = () => {
         }
 
         // Fetch technician profile
-        const techRes = await fetch("http://localhost:8080/api/technicians", {
+        const techRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -311,13 +311,25 @@ const TechnicianPage = () => {
   // Fetch bookings
   const fetchBookings = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/technicians/bookings", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians/bookings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const bookingData = await res.json();
-        setBookings(bookingData);
-      }
+      // if (res.ok) {
+      //   const bookingData = await res.json();
+      //   setBookings(bookingData);
+      // }
+      console.log("Response status:", res.status);
+    console.log("Response ok:", res.ok);
+    
+    if (res.ok) {
+      const bookingData = await res.json();
+      console.log("Booking data received:", bookingData);
+      console.log("Number of bookings:", bookingData.length);
+      setBookings(bookingData);
+    } else {
+      const errorData = await res.json();
+      console.error("Error response:", errorData);
+    }
     } catch (err) {
       console.error("Error fetching bookings:", err);
     }
@@ -326,7 +338,7 @@ const TechnicianPage = () => {
   // Fetch parts
   const fetchParts = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/parts", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/parts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -341,7 +353,7 @@ const TechnicianPage = () => {
   // Fetch ordered parts
   const fetchOrderedParts = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/parts/orders", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/parts/orders`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -356,7 +368,7 @@ const TechnicianPage = () => {
   // Order a part
   const orderPart = async (partId) => {
     try {
-      const res = await fetch("http://localhost:8080/api/parts/order", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/parts/order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -397,7 +409,7 @@ const TechnicianPage = () => {
     formData.append("Photo", kycFiles.Photo);
 
     try {
-      const res = await fetch("http://localhost:8080/api/technicians/kyc", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians/kyc`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -450,7 +462,7 @@ const TechnicianPage = () => {
         pricing: parseFloat(pricing) || 0
       };
 
-      const res = await fetch("http://localhost:8080/api/technicians", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/technicians`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -480,7 +492,7 @@ const TechnicianPage = () => {
     if (!reason) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/flag`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/${bookingId}/flag`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -501,7 +513,7 @@ const TechnicianPage = () => {
 
   const updateBookingStatus = async (bookingId, status) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/bookings/${bookingId}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/${bookingId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1022,9 +1034,9 @@ const TechnicianPage = () => {
                           {orderedParts.map(order => (
                             <tr key={order._id}>
                               <td>#{order._id.slice(-6)}</td>
-                              <td>{order.partId?.name}</td>
-                              <td>{order.partId?.category}</td>
-                              <td>₹{order.partId?.price}</td>
+                              <td>{order.p_id?.name}</td>
+                              <td>{order.p_id?.category}</td>
+                              <td>₹{order.price}</td>
                               <td>
                                 <span className={`status-badge status-${order.status}`}>
                                   {order.status}

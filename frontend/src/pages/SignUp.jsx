@@ -30,8 +30,8 @@ const SignUp = () => {
     e.preventDefault();
     // Decide route based on role
     const endpoint = formData.role === "customer" 
-      ? "http://localhost:8080/api/register_customer" 
-      : "http://localhost:8080/api/register_technician";
+      ? `${import.meta.env.VITE_BACKEND_URL}/api/register_customer`
+      : `${import.meta.env.VITE_BACKEND_URL}/api/register_technician`;
 
     try {
       const res = await fetch(endpoint, {

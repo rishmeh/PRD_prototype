@@ -8,8 +8,7 @@ const Login = () => {
     name: "",
     phone: "",
     email: "",
-    password: "",
-    role: "customer", // default
+    password: ""
   })
 
   const handleChange = (e) => {
@@ -29,7 +28,7 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Decide route based on role
-    const endpoint = "http://localhost:8080/api/login";
+    const endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/login`;
 
     try {
       const res = await fetch(endpoint, {
@@ -56,6 +55,9 @@ const Login = () => {
       }
       if (data.user.role === "customer"){
         navigate("/customer")
+      }
+      if (data.user.role === "admin"){
+        navigate("/admin")
       }
 
     } catch (err) {
@@ -97,19 +99,6 @@ const Login = () => {
               required
               placeholder="Enter your password"
             />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="role">Login as</label>
-            <select
-              id="role"
-              name="role"
-              value={formData.role === "customer" ? "0" : "1"}
-              onChange={handleRoleChange}
-            >
-              <option value="0">Customer</option>
-              <option value="1">Technician</option>
-            </select>
           </div>
 
           <button type="submit" className="login-btn">
