@@ -24,7 +24,7 @@ function HomePage() {
         </ul>
 
         <div className="hero-buttons">
-          <a href="/search" className="btn">Find Technicians</a>
+          <a href="/customer" className="btn">Find Technicians</a>
           <a href="/register_technician" className="btn">Become a Technician</a>
         </div>
       </section>
@@ -35,12 +35,12 @@ function HomePage() {
         <div className="card">
           <h3>For Customers</h3>
           <p>Search, compare, and book technicians based on expertise and ratings.</p>
-          <a href="/search">Start Now →</a>
+          <a href="/customer">Start Now →</a>
         </div>
         <div className="card">
           <h3>For Technicians</h3>
           <p>Create your profile, manage bookings, and grow your customer base.</p>
-          <a href="/signup">Join Us →</a>
+          <a href="/technician">Join Us →</a>
         </div>
         <div className="card">
           <h3>For Admins</h3>
